@@ -1,0 +1,111 @@
+syntax = "proto3";
+package embedding.v1;
+import "google/protobuf/timestamp.proto";
+
+service EmbeddingService {
+  rpc GetHealth (HealthRequest) returns (HealthResponse);
+  rpc ParseDocument (stream UploadChunk) returns (stream ParseResponse);
+  rpc CreateChunks (stream CreateChunksRequest) returns (stream ChunkResponse);
+  rpc EmbedChunks (stream EmbedChunksRequest) returns (stream EmbedResponse);
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  enum Status {
+    UNKNOWN = 0;
+    HEALTHY = 1;
+    UNHEALTHY = 2;
+  }
+
+  Status status = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  string version = 3;
+  bool model_loaded = 4;
+  double uptime_seconds = 5;
+}
+
+message UploadChunk {
+  oneof payload {
+    FileInfo info = 1;   // MUST be the first message (file metadata)
+    FileBytes chunk = 2; // raw file bytes streamed in chunks
+  }
+}
+
+message FileInfo {
+  string filename = 1;        // "report.pdf"
+  string content_type = 2;    // "application/pdf"
+  int64 total_size = 3;       // optional, helps logging/validation
+}
+
+message FileBytes {
+  bytes data = 1;             // part of the file (64KB chunks recommended)
+}
+
+message ParseResponse {
+  string content = 1;               // extracted text
+  DocumentMetadata metadata = 2;    // metadata
+}
+
+message DocumentMetadata {
+  int32 pages = 1;
+  string file_type = 2;
+  int64 file_size_bytes = 3;
+  double word_count = 4;
+}
+
+message CreateChunksRequest {
+  string text = 1;
+  int32 chunk_size_chars = 2;
+  int32 chunk_overlap_chars = 3;
+}
+
+message Chunk {
+  int64 chunk_id = 1;
+  string chunk_text = 2;
+  int32 char_count = 3;
+}
+
+message ChunkResponse {
+  repeated Chunk chunks = 1;
+  int32 total_chunks = 2;
+  int32 chunk_size_chars = 3;
+  int32 chunk_overlap_chars = 4;
+}
+
+message EmbedChunksRequest {
+  repeated ChunkInput chunks = 1;
+  Model model = 2;
+}
+
+message ChunkInput {
+  int64 chunk_id = 1;
+  string chunk_text = 2;
+}
+
+enum Model {
+  MODEL_UNSPECIFIED = 0;
+  E5_SMALL = 1;
+  E5_BASE = 2;
+  E5_LARGE = 3;
+  MULTILINGUAL = 4;
+}
+
+message EmbeddingItem {
+  int64 embedding_id = 1;
+  string embedding_text = 2;
+  repeated double embedding = 3;
+}
+
+message EmbedResponse {
+  repeated EmbeddingItem embeddings = 1;
+  int32 total_embeddings = 2;
+  int64 embedding_text_size_bytes = 3;
+  string model = 4;
+  int32 dimensions = 5;
+}
+
+message ErrorResponse {
+  string error_code = 1;
+  string message = 2;
+}
