@@ -1,6 +1,6 @@
 from sentence_transformers import SentenceTransformer
 import numpy as np
-from processor import embed_text
+from embedding_service.processor import embed_text
 import warnings
 warnings.filterwarnings("ignore")
 

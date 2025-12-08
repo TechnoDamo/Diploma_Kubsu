@@ -1,7 +1,7 @@
 from sentence_transformers import SentenceTransformer
 import numpy as np
-from embedder import embed_chunks
-from chunker import chunk_text
+from embedding_service.embedder import embed_chunks
+from embedding_service.chunker import chunk_text
 
 def embed_text(text: str, max_tokens: int = 500, overlap: int = 50, 
                      prompt_type: str = "classification") -> np.ndarray:
