@@ -1,0 +1,23 @@
+@startuml
+title Asynchronous Semantic Correspondence & LLM-Based Analysis System
+
+actor Client
+participant Gateway
+participant "API Processor" as API
+participant "Docling Server" as docling
+participant "Embedding gRPC Server" as Embedder
+participant "LLM Service" as LLM
+database "PostgreSQL + pgvector" as DB
+
+== Main Operation ==
+Client -> Gateway: POST /api/documents/compare
+
+== Basic Requests ==
+Client -> Gateway: POST /api/documents (raw file)
+
+
+Client -> Gateway: DELETE /api/documents/{id} - deletes a document with a given id
+Client -> Gateway: GET /api/documents - gets all documents info 
+Client -> Gateway: GET /api/documents/{id} - gets info for document with given id 
+
+@enduml
