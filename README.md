@@ -84,9 +84,9 @@ This service is responsible for accepting raw document files (PDF, DOCX, TXT, et
 We use [Docling Serve](https://github.com/docling-project/docling-serve) as the ingestion backend. It provides an HTTP API on top of [Docling](https://github.com/docling-project/docling), a modern Python library for high-quality document parsing and structured text extraction. <br>
 Docling Serve allows us to reliably transform real-world documents into clean, structured text representations that can be directly used by downstream components for chunking, embedding, retrieval, and contradiction analysis.
 
-## Embedding & Indexing Service
+## [Embedding & Indexing Service](./embedding_service/)
 
-gRPC server for embedding functions.
+gRPC server for embeddings creation.
 
 ## Knowledge Database
 
