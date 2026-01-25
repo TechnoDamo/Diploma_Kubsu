@@ -29,8 +29,6 @@
 
 # Project Overview
 
-Describe what the system is, what problem it solves, and why contradiction detection is a core differentiator.
-
 This project is basically a RAG system for semantic storage of knowledge bases. It provides functionality of adding, vieweing and removing files (PDF, DOCX, TXT) from the system (knowledge base). Once files are added, you can ask the system various question about the content of the whole knowledge base. You can also search for contradictions between contents of any given file and any group of other files (including the entire knowledge base).
 
 # Key Features
@@ -80,13 +78,15 @@ Here is the high-level design schema.
 
 ## API Gateway
 
-## Document Ingestion / Parsing Service
+## [Document Ingestion / Parsing Service](./document_parsing_service/)
 
 This service is responsible for accepting raw document files (PDF, DOCX, TXT, etc.) and extracting their textual and structural content. <br>
 We use [Docling Serve](https://github.com/docling-project/docling-serve) as the ingestion backend. It provides an HTTP API on top of [Docling](https://github.com/docling-project/docling), a modern Python library for high-quality document parsing and structured text extraction. <br>
 Docling Serve allows us to reliably transform real-world documents into clean, structured text representations that can be directly used by downstream components for chunking, embedding, retrieval, and contradiction analysis.
 
 ## Embedding & Indexing Service
+
+gRPC server for embedding functions.
 
 ## Knowledge Database
 
