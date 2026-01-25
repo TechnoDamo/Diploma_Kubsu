@@ -15,6 +15,84 @@ Workers are compute services, not product services.
 
 They do not handle routing, business logic, or external providers. They only know how to turn text into vectors efficiently.
 
+# Structrue 
+```
+gRPC Server
+   ↓
+Request Router
+   ↓
+Batch Scheduler
+   ↓
+Embedding Engine
+   ↓
+Model Backend (Torch)
+   ↓
+Hardware (CPU / GPU)
+```
+<br>
+
+## internal layers
+Internally we have these isolated layers: <br>
+**transport**   → gRPC, lifecycle <br>
+**batching**    → queues, flush logic <br>
+**engine**      → embedding pipeline <br>
+**backend**     → torch / onnx execution <br>
+**models**      → loading, warmup <br>
+**infra**       → config, logging, metrics <br>
+
+## file structure
+```
+worker/
+├── cmd/
+│   └── server/
+│       └── main.py (service entrypoint)
+│ 
+├── worker/
+│   ├── api/
+│   │   └── grpc_server.py (gRPC request handling)
+│   │
+│   ├── core/ (worker brains)
+│   │   ├── engine.py (embedding pipeline orchestrator)
+│   │   ├── batcher.py (collects and groups requests)
+│   │   ├── scheduler.py ()
+│   │   ├── types.py (internal dataclasses)
+│   │   └── exceptions.py (controlled failure types)
+│   │
+│   ├── backend/ (model execution layer)
+│   │   ├── base.py (backend interface)
+│   │   └── torch_backend.py (HuggingFace + torch implementation)
+│   │
+│   ├── models/ (model lifecycly management)
+│   │   ├── loader.py 
+│   │   ├── tokenizer.py
+│   │   └── warmup.py
+│   │
+│   ├── pooling/ (embedding extraction logic)
+│   │   ├── base.py
+│   │   ├── mean.py
+│   │   └── cls.py
+│   │
+│   ├── postprocess/ (vector post processing)
+│   │   └── normalization.py
+│   │
+│   ├── infra/
+│   │   ├── config.py
+│   │   ├── logging.py
+│   │   ├── metrics.py
+│   │   └── health.py
+│   │
+│   └── __init__.py
+│
+├── configs/
+│   └── example.yaml
+│
+├── tests/
+│
+├── Dockerfile
+├── pyproject.toml (or requirements.txt)
+└── README.md
+```
+
 # Tech Stack:
 
 ## Language runtime
