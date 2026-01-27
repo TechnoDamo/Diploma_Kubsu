@@ -1,0 +1,94 @@
+@startuml
+title Asynchronous Semantic Correspondence & LLM-Based Analysis System
+
+actor Client
+participant Gateway
+participant "API Processor" as API
+participant "Docling Server" as docling
+participant "Embedding gRPC Server" as Embedder
+participant "LLM Service" as LLM
+participant "Object Storage" as minio
+database "Database" as DB
+
+== Main Operations ==
+Client -> Gateway: POST /api/documents (raw file)
+activate Gateway
+    Gateway -> API: POST /documents
+    activate API
+    API -> docling: POST /v1/convert/file
+    activate docling
+    docling --> API: Document Text
+    deactivate docling
+    rnote over API
+    Given text is being chunked
+    endhnote 
+    loop Until all chunks are vectorised 
+    API -> Embedder: some of the chunks
+    activate Embedder
+    Embedder --> API: embeddings of chunks 
+    deactivate Embedder
+    end 
+    API -> minio: file upload 
+    API -> DB: file data&embeddings upload
+    activate DB
+    DB --> API: successfull response
+    deactivate DB
+    API --> Gateway: 201 ok
+    deactivate API
+Gateway --> Client: 201 ok
+deactivate Gateway
+
+Client -> Gateway: POST /api/documents/compare 
+activate Gateway 
+    Gateway -> API: POST /documents/compare
+    activate API 
+        API -> DB: select embeddings of a given document
+        activate DB
+        DB --> API: embeddings of a given document
+        deactivate DB
+        API -> DB: search of all the chunks close enough (in the vector space) to those of a given file
+        activate DB
+        DB --> API: relevant chunks from other documents
+        deactivate DB
+        rnote over API 
+        LLM request construction
+        end rnote
+        API -> LLM: request for LLM to analyse and compare given chunks  
+        activate LLM
+        LLM --> API: LLM response 
+        deactivate LLM
+    API --> Gateway: Comparation result
+    deactivate API
+Gateway --> Client: Comparation result 
+deactivate Gateway
+
+Client -> Gateway: POST /api/documents/question 
+activate Gateway 
+    Gateway -> API: POST /documents/question
+    activate API 
+        API -> DB: select embeddings of a given document
+        activate DB
+        DB --> API: embeddings of a given document
+        deactivate DB
+        API -> DB: search of all the chunks close enough (in the vector space) to those of a given file
+        activate DB
+        DB --> API: relevant chunks from other documents
+        deactivate DB
+        rnote over API 
+        LLM request construction
+        end rnote
+        API -> LLM: request for LLM to analyse and compare given chunks  
+        activate LLM
+        LLM --> API: LLM response 
+        deactivate LLM
+    API --> Gateway: Comparation result
+    deactivate API
+Gateway --> Client: Comparation result 
+deactivate Gateway
+
+== Basic Requests ==
+Client -> Gateway: DELETE /api/documents/{id} - deletes a document with a given id
+Client -> Gateway: GET /api/documents - gets all documents info 
+Client -> Gateway: GET /api/documents/{id} - gets info for document with given id 
+
+@enduml

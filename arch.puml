@@ -1,0 +1,38 @@
+participant Client as client
+participant Gateway as gate 
+participant API_Server as server
+participant LLM as llm
+participant VectorDB as vdb
+participant Outside as out 
+
+client -> gate: Query
+activate gate
+gate -> server: Query
+activate server
+server -> llm: Client Query
+activate llm
+hnote over llm
+Preprocessing
+end hnote
+llm --> server: Preprocessed query
+deactivate llm
+server -> vdb: Processed Search Query
+activate vdb
+vdb --> server: Raw response (Text Chunks)
+deactivate vdb
+server -> llm: Raw Response
+activate llm
+hnote over llm
+Processing for human-like and relevat response
+end hnote
+llm --> server: Processed response
+deactivate llm
+server --> gate: Processed response
+deactivate server
+gate --> client: Processed response 
+deactivate gate
+out -> vdb: New data 
+hnote over vdb
+adjustments due to changes 
+(altering or adding new data)
+end hnote
