@@ -1,4 +1,4 @@
-# 🧠 (No name for now) — Intelligent RAG System with Cross-Document Contradiction Detection
+# 🧠 Mimir — Intelligent RAG System with Cross-Document Analysis
 
 > A Retrieval-Augmented Generation platform for building document knowledge bases with a core focus on **simultaneous multi-document comparison** and **automatic contradiction discovery**.
 

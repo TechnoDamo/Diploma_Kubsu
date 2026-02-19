@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package worker.v1;
+
+service WorkerService {
+  // Single embedding request
+  rpc Embed(EmbedRequest) returns (EmbedResponse);
+  
+  // Batch embedding request
+  rpc EmbedBatch(EmbedBatchRequest) returns (EmbedBatchResponse);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+  
+  // Get model info
+  rpc GetModelInfo(ModelInfoRequest) returns (ModelInfoResponse);
+}
+
+message EmbedRequest {
+  string text = 1;
+  optional string model_id = 2;
+  optional PoolingMethod pooling = 3;
+  optional bool normalize = 4;
+}
+
+message EmbedBatchRequest {
+  repeated string texts = 1;
+  optional string model_id = 2;
+  optional PoolingMethod pooling = 3;
+  optional bool normalize = 4;
+}
+
+message EmbedResponse {
+  repeated float embedding = 1;
+  ModelInfo model_info = 2;
+  int32 tokens = 3;
+}
+
+message EmbedBatchResponse {
+  repeated EmbedResponse embeddings = 1;
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  bool healthy = 1;
+  string status = 2;
+  int64 uptime_seconds = 3;
+}
+
+message ModelInfoRequest {
+  optional string model_id = 1;
+}
+
+message ModelInfoResponse {
+  string model_id = 1;
+  int32 embedding_dimension = 2;
+  int32 max_sequence_length = 3;
+  string pooling_method = 4;
+  bool supports_normalization = 5;
+  string device = 6;
+  string dtype = 7;
+}
+
+message ModelInfo {
+  string model_id = 1;
+  int32 embedding_dimension = 2;
+  int32 max_sequence_length = 3;
+}
+
+enum PoolingMethod {
+  POOLING_METHOD_UNSPECIFIED = 0;
+  POOLING_METHOD_MEAN = 1;
+  POOLING_METHOD_CLS = 2;
+  POOLING_METHOD_MAX = 3;
+}

@@ -1,4 +1,4 @@
-# Worker Plane (Python)
+stal l# Worker Plane (Python)
 
 The worker plane contains the embedding model runtime.
 
