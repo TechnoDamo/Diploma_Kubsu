@@ -1,142 +1,124 @@
-stal l# Worker Plane (Python)
+# Worker Plane (Python)
 
-The worker plane contains the embedding model runtime.
+The worker plane runs a single embedding model and exposes it over gRPC. It is a compute service only: it loads a model, embeds text, and returns vectors. No routing or business logic lives here.
 
-Each worker service runs one embedding model and is responsible for:
-
-- loading and warming up models
-- tokenization and tensor preparation
-- efficient batching
-- inference execution (CPU/GPU)
-- pooling and normalization
-- returning embeddings over gRPC
-
-Workers are compute services, not product services.
-
-They do not handle routing, business logic, or external providers. They only know how to turn text into vectors efficiently.
-
-# Structrue 
+## Runtime flow
 ```
-gRPC Server
-   ↓
-Request Router
-   ↓
-Batch Scheduler
-   ↓
-Embedding Engine
-   ↓
-Model Backend (Torch)
-   ↓
-Hardware (CPU / GPU)
-```
-<br>
-
-## internal layers
-Internally we have these isolated layers: <br>
-**transport**   → gRPC, lifecycle <br>
-**batching**    → queues, flush logic <br>
-**engine**      → embedding pipeline <br>
-**backend**     → torch / onnx execution <br>
-**models**      → loading, warmup <br>
-**infra**       → config, logging, metrics <br>
-
-## file structure
-```
-worker/
-├── cmd/
-│   └── server/
-│       └── main.py (service entrypoint)
-│ 
-├── worker/
-│   ├── api/
-│   │   └── grpc_server.py (gRPC request handling)
-│   │
-│   ├── core/ (worker brains)
-│   │   ├── engine.py (embedding pipeline orchestrator)
-│   │   ├── batcher.py (collects and groups requests)
-│   │   ├── scheduler.py ()
-│   │   ├── types.py (internal dataclasses)
-│   │   └── exceptions.py (controlled failure types)
-│   │
-│   ├── backend/ (model execution layer)
-│   │   ├── base.py (backend interface)
-│   │   └── torch_backend.py (HuggingFace + torch implementation)
-│   │
-│   ├── models/ (model lifecycly management)
-│   │   ├── loader.py 
-│   │   ├── tokenizer.py
-│   │   └── warmup.py
-│   │
-│   ├── pooling/ (embedding extraction logic)
-│   │   ├── base.py
-│   │   ├── mean.py
-│   │   └── cls.py
-│   │
-│   ├── postprocess/ (vector post processing)
-│   │   └── normalization.py
-│   │
-│   ├── infra/
-│   │   ├── config.py
-│   │   ├── logging.py
-│   │   ├── metrics.py
-│   │   └── health.py
-│   │
-│   └── __init__.py
-│
-├── configs/
-│   └── example.yaml
-│
-├── tests/
-│
-├── Dockerfile
-├── pyproject.toml (or requirements.txt)
-└── README.md
+Entrypoint (cmd/server/main.py)
+  -> gRPC server (worker/api/grpc_server.py)
+  -> Embedding engine (worker/core/engine.py)
+  -> Model loader (worker/models/loader.py)
+  -> Pooling + normalization
 ```
 
-# Tech Stack:
+## Configuration
+Configuration is loaded from `configs/config.yaml` with env overrides. Env always wins.
 
-## Language runtime
-### Python 3.11  
-**Why:** Fastest CPython, improved asyncio performance, fully supported by PyTorch, HuggingFace, and gRPC.  
+- Config path: `WORKER_CONFIG_PATH` (default `configs/config.yaml`)
+- Any `general` key is applied only if its `WORKER_*` env var is not set.
 
-## ML execution layer (core)
-### PyTorch (`torch`)  
-**Why:** Industry standard for ML inference, best GPU support, first-class HuggingFace integration, production-proven.  
+Example `configs/config.yaml`:
+```yaml
+general:
+  grpc_host: localhost
+  grpc_port: 50051
+  grpc_max_workers: 4
+  grpc_max_message_length: 104857600
+  cache_dir: /models/cache
+  trust_remote_code: true
+  device: cuda
+  dtype: float32
+  max_batch_size: 32
+  batch_timeout_ms: 50
+  log_level: INFO
+  log_format: json
 
-### HuggingFace Transformers (`transformers`)  
-**Why:** Universal model loader, massive model zoo, standardised configs, tokenizer integration.  
+models:
+  default_model:
+    pooling: mean
+    normalization: l2
+    max_sequence_length: 512
+    supported_pooling:
+      - mean
+      - cls
+      - max
+    supported_normalization:
+      - none
+      - l2
 
-### HuggingFace Tokenizers (`tokenizers`)  
-**Why:** Ultra-fast Rust-based tokenizers, industry standard, integrated with Transformers.  
+  ai-forever/ru-en-RoSBERTa:
+    pooling: mean
+    normalization: l2
+    max_sequence_length: 512
+    supported_pooling:
+      - mean
+      - cls
+      - max
+    supported_normalization:
+      - none
+      - l2
+```
 
-### NumPy (`numpy`)  
-**Why:** Standard vector interchange format, required by most ML tooling and vector databases.  
+Behavior:
+- If `model_id` is not found in `models`, `default_model` is used.
+- If a model is found, all its fields must be present.
+- Pooling/normalization can be overridden per request if provided.
 
-## Service & concurrency layer
-### gRPC (async) — `grpcio`, `grpcio-tools`  
-**Why:** Fast binary RPC, strong contracts, polyglot clients, streaming support, infra-grade reliability.  
+## API (gRPC)
+The proto lives at `worker/v1/worker.proto`. The main RPCs are:
+- `Embed` for single text
+- `EmbedBatch` for batch items
+- `HealthCheck`
+- `GetModelInfo`
 
-### asyncio (built-in)  
-**Why:** Native concurrency, batching, background scheduling, integrates well with gRPC.  
+Readiness:
+- `HealthCheck` returns `NOT_READY` until the model is loaded and warmup (if enabled) completes.
 
-### uvloop (optional)  
-**Why:** Faster event loop, lower latency under load.  
+## Project structure
+```
+cmd/server/main.py           Entrypoint
+worker/api/grpc_server.py    gRPC server and request handling
+worker/core/engine.py        Embedding pipeline
+worker/core/types.py         Internal dataclasses
+worker/models/loader.py      HF model + tokenizer loading
+worker/models/registry.py    Model defaults and validation
+worker/pooling/base.py       Pooling strategies
+worker/postprocess/normalization.py  Normalization
+worker/infra/config.py       Config + env
+worker/infra/logging.py      Structured logging
+```
 
-## Operations & support
+## Notes
+- The worker is single-model per process. Run multiple containers for multiple models.
+- `max_batch_size` and `batch_timeout_ms` are reserved for future batching logic.
 
-### pydantic-settings  
-**Why:** Typed configuration, environment support, validation, clarity.  
+## Local commands
+- Run: `make run` or `scripts/run-local.sh`
+- Tests: `make test`
+- Regenerate proto: `make proto`
 
-### Structured logging (`structlog` / `loguru`)  
-**Why:** Async-friendly, JSON logs, production hygiene.  
-**Alternatives:** standard `logging` 
+## Docker
+Build and run the worker:
+```
+docker build -t embedding-worker .
+docker run --rm -p 50051:50051 \
+  -e WORKER_CONFIG_PATH=/app/configs/config.yaml \
+  -e WORKER_MODEL_ID=ai-forever/ru-en-RoSBERTa \
+  -e WORKER_DEVICE=cpu \
+  -v "$(pwd)/configs:/app/configs" \
+  -v "$(pwd)/models:/app/models" \
+  embedding-worker
+```
 
-## Useful additions
+Or via compose:
+```
+docker compose up --build
+```
 
-- `orjson` – fast JSON serialization  
-- `torchmetrics` – correctness and diagnostics  
-- `sentencepiece` – tokenizer backend  
-- `uvicorn` – optional HTTP health endpoint  
-
-
-
+## grpcui (Docker)
+Run `grpcui` pointing at the worker:
+```
+docker run --rm -p 8080:8080 \
+  fullstorydev/grpcui \
+  -plaintext host.docker.internal:50051
+```

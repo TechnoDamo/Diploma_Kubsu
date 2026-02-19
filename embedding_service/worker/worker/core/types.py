@@ -12,6 +12,12 @@ class PoolingMethod(str, Enum):
     MAX = "max"
 
 
+class NormalizationMethod(str, Enum):
+    """Normalization methods for embeddings."""
+    NONE = "none"
+    L2 = "l2"
+
+
 @dataclass
 class EmbeddingRequest:
     """Single embedding request."""
@@ -19,7 +25,8 @@ class EmbeddingRequest:
     request_id: str = field(default_factory=lambda: str(time.time_ns()))
     model_id: Optional[str] = None
     pooling: PoolingMethod = PoolingMethod.MEAN
-    normalize: bool = True
+    normalization: NormalizationMethod = NormalizationMethod.L2
+    max_sequence_length: Optional[int] = None
     created_at: float = field(default_factory=time.time)
 
 
@@ -57,8 +64,10 @@ class ModelInfo:
     model_id: str
     embedding_dimension: int
     max_sequence_length: int
-    pooling_method: str
-    supports_normalization: bool
+    default_pooling: str
+    default_normalization: str
+    supported_pooling: List[str]
+    supported_normalization: List[str]
     device: str
     dtype: str
     loaded_at: float = field(default_factory=time.time)

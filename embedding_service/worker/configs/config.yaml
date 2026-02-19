@@ -1,0 +1,38 @@
+general:
+  grpc_host: localhost
+  grpc_port: 50051
+  grpc_max_workers: 4
+  grpc_max_message_length: 10
+  cache_dir: some appropriate dir
+  trust_remote_code: true
+  device: cuda
+  dtype: float32
+  max_batch_size: 32
+  batch_timeout_ms: 50
+  log_level: INFO
+  log_format: json
+
+models:
+  default_model:
+    pooling: mean
+    normalization: l2
+    max_sequence_length: 512
+    supported_pooling:
+      - mean
+      - cls
+      - max
+    supported_normalization:
+      - none
+      - l2
+
+  ai-forever/ru-en-RoSBERTa:
+    pooling: mean
+    normalization: l2
+    max_sequence_length: 512
+    supported_pooling:
+      - mean
+      - cls
+      - max
+    supported_normalization:
+      - none
+      - l2

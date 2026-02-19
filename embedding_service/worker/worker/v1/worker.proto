@@ -5,67 +5,103 @@ package worker.v1;
 service WorkerService {
   // Single embedding request
   rpc Embed(EmbedRequest) returns (EmbedResponse);
-  
+
   // Batch embedding request
   rpc EmbedBatch(EmbedBatchRequest) returns (EmbedBatchResponse);
-  
+
   // Health check
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
-  
+
   // Get model info
   rpc GetModelInfo(ModelInfoRequest) returns (ModelInfoResponse);
 }
 
-message EmbedRequest {
-  string text = 1;
-  optional string model_id = 2;
-  optional PoolingMethod pooling = 3;
-  optional bool normalize = 4;
+message EmbedOptions {
+  // Pooling method override for this request.
+  PoolingMethod pooling = 1;
+  // Normalization method override for this request.
+  NormalizationMethod normalization = 2;
 }
 
-message EmbedBatchRequest {
-  repeated string texts = 1;
-  optional string model_id = 2;
-  optional PoolingMethod pooling = 3;
-  optional bool normalize = 4;
+message EmbedRequest {
+  // Input text to embed.
+  string text = 1;
+  // Optional client-generated request identifier.
+  string request_id = 2;
+  // Optional per-request overrides.
+  EmbedOptions options = 3;
 }
 
 message EmbedResponse {
-  repeated float embedding = 1;
-  ModelInfo model_info = 2;
+  // Echoed request identifier.
+  string request_id = 1;
+  // Embedding vector.
+  repeated float embedding = 2;
+  // Token count used for the embedding.
   int32 tokens = 3;
+  // Model metadata used for this response.
+  ModelInfo model_info = 4;
+}
+
+message EmbedItem {
+  // Input text to embed.
+  string text = 1;
+  // Optional client-generated request identifier.
+  string request_id = 2;
+}
+
+message EmbedBatchRequest {
+  // Batch items to embed.
+  repeated EmbedItem items = 1;
+  // Default overrides applied when an item omits options.
+  EmbedOptions defaults = 2;
 }
 
 message EmbedBatchResponse {
+  // Embeddings for each item in the request.
   repeated EmbedResponse embeddings = 1;
 }
 
 message HealthCheckRequest {}
 
 message HealthCheckResponse {
+  // Whether the worker is healthy.
   bool healthy = 1;
+  // Human-readable status.
   string status = 2;
+  // Process uptime in seconds.
   int64 uptime_seconds = 3;
 }
 
 message ModelInfoRequest {
-  optional string model_id = 1;
+  // Optional model identifier (unused for single-model workers).
+  string model_id = 1;
 }
 
 message ModelInfoResponse {
-  string model_id = 1;
-  int32 embedding_dimension = 2;
-  int32 max_sequence_length = 3;
-  string pooling_method = 4;
-  bool supports_normalization = 5;
-  string device = 6;
-  string dtype = 7;
+  // Model metadata for the worker.
+  ModelInfo model_info = 1;
 }
 
 message ModelInfo {
+  // Model identifier.
   string model_id = 1;
+  // Embedding vector dimension.
   int32 embedding_dimension = 2;
+  // Maximum sequence length supported by the tokenizer/model.
   int32 max_sequence_length = 3;
+  // Default pooling method used by the worker.
+  PoolingMethod default_pooling = 4;
+  // Default normalization method used by the worker.
+  NormalizationMethod default_normalization = 5;
+  // Pooling methods supported by this model in this worker.
+  repeated PoolingMethod supported_pooling = 6;
+  // Normalization methods supported by this model in this worker.
+  repeated NormalizationMethod supported_normalization = 7;
+  // Device used for inference.
+  string device = 8;
+  // Data type used for model weights.
+  string dtype = 9;
 }
 
 enum PoolingMethod {
@@ -73,4 +109,10 @@ enum PoolingMethod {
   POOLING_METHOD_MEAN = 1;
   POOLING_METHOD_CLS = 2;
   POOLING_METHOD_MAX = 3;
+}
+
+enum NormalizationMethod {
+  NORMALIZATION_METHOD_UNSPECIFIED = 0;
+  NORMALIZATION_METHOD_NONE = 1;
+  NORMALIZATION_METHOD_L2 = 2;
 }

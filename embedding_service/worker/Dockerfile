@@ -28,6 +28,7 @@ RUN python -m grpc_tools.protoc \
 COPY worker/ ./worker/
 COPY cmd/ ./cmd/
 COPY test_client.py ./
+COPY configs/ ./configs/
 
 # Create non-root user
 RUN useradd -m -u 1000 worker && chown -R worker:worker /app

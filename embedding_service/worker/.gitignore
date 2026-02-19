@@ -50,7 +50,7 @@ Dockerfile.backup
 Dockerfile.new
 
 # Models and Data
-models/
+/models/
 *.pth
 *.pt
 *.bin
@@ -100,7 +100,10 @@ Thumbs.db
 # Project specific
 requirements_freeze.txt
 notes.md
-configs/
+# Keep config directory tracked for defaults
+!/configs/
+configs/*
+!/configs/config.yaml
 docker-compose.yml.backup
 test_simple.py
 

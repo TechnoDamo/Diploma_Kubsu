@@ -7,15 +7,15 @@ services:
       - "50051:50051"
     environment:
       - WORKER_MODEL_ID=BAAI/bge-small-en-v1.5
+      - WORKER_CONFIG_PATH=/app/configs/config.yaml
       - WORKER_DEVICE=cpu
       - WORKER_GRPC_HOST=0.0.0.0
       - WORKER_GRPC_PORT=50051
       - WORKER_LOG_LEVEL=INFO
       - WORKER_WARMUP_ON_START=true
-      - WORKER_MAX_BATCH_SIZE=32
-      - WORKER_MAX_SEQUENCE_LENGTH=512
     volumes:
       - ./models:/app/models
+      - ./configs:/app/configs
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "poetry", "run", "python", "-c", "import grpc; import sys; sys.path.insert(0, '/app'); from worker.v1 import worker_pb2, worker_pb2_grpc; channel = grpc.insecure_channel('localhost:50051'); stub = worker_pb2_grpc.WorkerServiceStub(channel); response = stub.HealthCheck(worker_pb2.HealthCheckRequest(), timeout=2); sys.exit(0 if response.healthy else 1)"]

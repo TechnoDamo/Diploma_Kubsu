@@ -5,10 +5,10 @@ import torch
 import numpy as np
 
 from worker.infra.logging import logger
-from worker.core.types import EmbeddingRequest, EmbeddingResult, PoolingMethod
+from worker.core.types import EmbeddingRequest, EmbeddingResult, PoolingMethod, NormalizationMethod
 from worker.models.loader import ModelLoader
 from worker.pooling.base import get_pooling_strategy
-from worker.postprocess.normalization import normalize_embeddings
+from worker.postprocess.normalization import apply_normalization
 
 
 class EmbeddingEngine:
@@ -32,7 +32,7 @@ class EmbeddingEngine:
                 text=text,
                 request_id=f"warmup_{i}",
                 pooling=PoolingMethod.MEAN,
-                normalize=True,
+                normalization=NormalizationMethod.L2,
             )
             for i, text in enumerate(texts)
         ]
@@ -59,12 +59,24 @@ class EmbeddingEngine:
         """Embed a batch of texts."""
         if not requests:
             return []
+
+        pooling_method = requests[0].pooling
+        normalization_method = requests[0].normalization
+        max_sequence_length = requests[0].max_sequence_length
+
+        for request in requests[1:]:
+            if request.pooling != pooling_method:
+                raise ValueError("Batch requests must use the same pooling method")
+            if request.normalization != normalization_method:
+                raise ValueError("Batch requests must use the same normalization method")
+            if request.max_sequence_length != max_sequence_length:
+                raise ValueError("Batch requests must use the same max sequence length")
         
         start_time = time.time()
         texts = [req.text for req in requests]
         
         # Tokenize
-        tokenized = self.model_loader.tokenize(texts)
+        tokenized = self.model_loader.tokenize(texts, max_length=max_sequence_length)
         input_ids = tokenized["input_ids"]
         attention_mask = tokenized.get("attention_mask")
         
@@ -72,15 +84,14 @@ class EmbeddingEngine:
         hidden_states = self.model_loader.encode(tokenized)
         
         # Get pooling strategy from first request (assume same for batch)
-        pooling_method = requests[0].pooling.value if hasattr(requests[0].pooling, "value") else requests[0].pooling
-        pooling_strategy = get_pooling_strategy(pooling_method)
+        pooling_name = pooling_method.value if hasattr(pooling_method, "value") else pooling_method
+        pooling_strategy = get_pooling_strategy(pooling_name)
         
         # Pool
         embeddings = pooling_strategy.pool(hidden_states, attention_mask)
         
         # Normalize if requested
-        if requests[0].normalize:
-            embeddings = normalize_embeddings(embeddings)
+        embeddings = apply_normalization(embeddings, normalization_method)
         
         # Convert to numpy
         embeddings_np = embeddings.cpu().numpy()
@@ -111,5 +122,4 @@ class EmbeddingEngine:
             total_time_ms=(time.time() - start_time) * 1000,
         )
         
-        return results
         return results

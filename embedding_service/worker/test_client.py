@@ -32,9 +32,9 @@ def test_model_info():
         
         response = stub.GetModelInfo(worker_pb2.ModelInfoRequest())
         print(f"Model info response: {response}")
-        print(f"✓ Model: {response.model_id}")
-        print(f"✓ Embedding dimension: {response.embedding_dimension}")
-        print(f"✓ Max sequence length: {response.max_sequence_length}")
+        print(f"✓ Model: {response.model_info.model_id}")
+        print(f"✓ Embedding dimension: {response.model_info.embedding_dimension}")
+        print(f"✓ Max sequence length: {response.model_info.max_sequence_length}")
         
         return response
 
@@ -48,7 +48,9 @@ def test_single_embedding():
         
         request = worker_pb2.EmbedRequest(
             text="This is a test sentence for embedding generation.",
-            normalize=True,
+            options=worker_pb2.EmbedOptions(
+                normalization=worker_pb2.NORMALIZATION_METHOD_L2,
+            ),
         )
         
         start_time = time.time()
@@ -85,8 +87,10 @@ def test_batch_embedding():
         ]
         
         request = worker_pb2.EmbedBatchRequest(
-            texts=texts,
-            normalize=True,
+            items=[worker_pb2.EmbedItem(text=text) for text in texts],
+            defaults=worker_pb2.EmbedOptions(
+                normalization=worker_pb2.NORMALIZATION_METHOD_L2,
+            ),
         )
         
         start_time = time.time()
