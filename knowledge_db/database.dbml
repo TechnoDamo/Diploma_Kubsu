@@ -2,6 +2,8 @@ Table "embeddings"."embedding_models" {
   "id" bigint [pk, not null, increment]
   "name" varchar(100) [not null]
   "description" text
+  "dimension" int [not null]
+  "is_active" boolean [not null, default: true]
 
   Indexes {
     name [unique, name: "idx_embedding_models_name"]
@@ -10,8 +12,8 @@ Table "embeddings"."embedding_models" {
 
 Table "embeddings"."embeddings" {
   "id" bigint [pk, not null, increment]
-  "chunk_id" bigint [not null]
-  "model_id" bigint [not null]
+  "chunk_id" bigint [not null, ref: < "documents"."document_chunks"."id"]
+  "model_id" bigint [not null, ref: < "embeddings"."embedding_models"."id"]
   "version" int [not null]
   "embedding" vector [not null]
   "dimensionality" int [not null]
@@ -26,10 +28,10 @@ Table "embeddings"."embeddings" {
 
 Table "documents"."documents" {
   "id" bigint [pk, not null, increment]
-  "project_id" bigint [not null]
-  "document_status_id" bigint [not null]
-  "ingestion_pipeline_id" bigint [not null]
-  "embedding_pipeline_id" bigint [not null]
+  "project_id" bigint [not null, ref: < "documents"."projects"."id"]
+  "document_status_id" bigint [not null, ref: < "documents"."document_statuses"."id"]
+  "ingestion_pipeline_id" bigint [not null, ref: < "documents"."ingestion_pipelines"."id"]
+  "embedding_pipeline_id" bigint [not null, ref: < "documents"."embedding_pipelines"."id"]
   "name" varchar(500) [not null]
   "description" text
   "file_address" varchar(1000) [not null]
@@ -59,7 +61,7 @@ Table "documents"."projects" {
 
 Table "documents"."document_chunks" {
   "id" bigint [pk, not null, increment]
-  "document_id" bigint [not null]
+  "document_id" bigint [not null, ref: < "documents"."documents"."id"]
   "chunk_order_id" int [not null]
   "chunk_text" text [not null]
   "char_count" int [not null]
@@ -74,8 +76,8 @@ Table "documents"."document_chunks" {
 
 Table "documents"."document_history" {
   "id" bigint [pk, not null, increment]
-  "document_id" bigint [not null]
-  "operation_type_id" bigint [not null]
+  "document_id" bigint [not null, ref: < "documents"."documents"."id"]
+  "operation_type_id" bigint [not null, ref: < "documents"."document_operation_types"."id"]
   "comment" text [not null]
   "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
 

@@ -30,7 +30,6 @@ services:
       - postgres_data:${POSTGRES_DATA_DIR}
       - ./backups:${BACKUP_DIR}
       - ./logs:${LOG_DIR}
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql 
     
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
@@ -47,6 +46,24 @@ services:
         reservations:
           memory: ${CONTAINER_MEMORY_RESERVATION}
           cpus: ${CONTAINER_CPU_RESERVATION}
+
+  migrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.migrator
+    restart: "no"
+    depends_on:
+      postgres-vector:
+        condition: service_healthy
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    command:
+      - -dir
+      - /workspace/migrations
+      - postgres
+      - host=postgres-vector port=5432 user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} sslmode=disable
+      - up
 
 volumes:
   postgres_data:
