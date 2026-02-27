@@ -1,0 +1,140 @@
+Table "embeddings"."embedding_models" {
+  "id" bigint [pk, not null, increment]
+  "name" varchar(100) [not null]
+  "description" text
+
+  Indexes {
+    name [unique, name: "idx_embedding_models_name"]
+  }
+}
+
+Table "embeddings"."embeddings" {
+  "id" bigint [pk, not null, increment]
+  "chunk_id" bigint [not null]
+  "model_id" bigint [not null]
+  "version" int [not null]
+  "embedding" vector [not null]
+  "dimensionality" int [not null]
+  "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  Indexes {
+    (chunk_id, model_id, version) [unique, name: "idx_embeddings_chunk_id_model_id_version"]
+    chunk_id [name: "idx_embeddings_chunk_id"]
+    model_id [name: "idx_embeddings_model_id"]
+  }
+}
+
+Table "documents"."documents" {
+  "id" bigint [pk, not null, increment]
+  "project_id" bigint [not null]
+  "document_status_id" bigint [not null]
+  "ingestion_pipeline_id" bigint [not null]
+  "embedding_pipeline_id" bigint [not null]
+  "name" varchar(500) [not null]
+  "description" text
+  "file_address" varchar(1000) [not null]
+  "file_size_bytes" bigint [not null]
+  "mime_type" varchar(255) [not null]
+  "checksum" varchar(128) [not null]
+  "language" varchar(32)
+  "total_chunks" int [not null, default: 0]
+  "total_token_count" int [not null, default: 0]
+  "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  "updated_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  Indexes {
+    file_address [unique, name: "idx_documents_file_address"]
+    checksum [name: "idx_documents_checksum"]
+    project_id [name: "idx_documents_project_id"]
+  }
+}
+
+Table "documents"."projects" {
+  "id" bigint [pk, not null, increment]
+  "name" varchar(500) [not null]
+  "context" text [not null]
+  "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  "updated_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table "documents"."document_chunks" {
+  "id" bigint [pk, not null, increment]
+  "document_id" bigint [not null]
+  "chunk_order_id" int [not null]
+  "chunk_text" text [not null]
+  "char_count" int [not null]
+  "token_count" int [not null]
+  "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  Indexes {
+    (document_id, chunk_order_id) [unique, name: "idx_document_chunks_document_id_chunk_order"]
+    document_id [name: "idx_document_chunks_document_id"]
+  }
+}
+
+Table "documents"."document_history" {
+  "id" bigint [pk, not null, increment]
+  "document_id" bigint [not null]
+  "operation_type_id" bigint [not null]
+  "comment" text [not null]
+  "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  Indexes {
+    document_id [name: "idx_document_history_document_id"]
+  }
+}
+
+Table "documents"."document_operation_types" {
+  "id" bigint [pk, not null, increment]
+  "name" varchar(100) [not null]
+  "description" text [not null]
+
+  Indexes {
+    name [unique, name: "idx_document_operation_types_name"]
+  }
+}
+
+Table "documents"."document_statuses" {
+  "id" bigint [pk, not null, increment]
+  "name" varchar(100) [not null]
+  "description" text [not null]
+
+  Indexes {
+    name [unique, name: "idx_document_statuses_name"]
+  }
+}
+
+Table "documents"."ingestion_pipelines" {
+  "id" bigint [pk, not null]
+  "name" varchar(500) [not null]
+  "description" text [not null]
+}
+
+Table "documents"."embedding_pipelines" {
+  "id" bigint [pk, not null]
+  "name" varchar(500) [not null]
+  "description" text [not null]
+}
+
+Table "system"."request_types" {
+  "id" bigint [pk, not null, increment]
+  "name" varchar(100) [not null]
+  "description" text
+
+  Indexes {
+    name [unique, name: "idx_request_types_name"]
+  }
+}
+
+Table "system"."request_history" {
+  "id" bigint [pk, not null, increment]
+  "type_id" bigint [not null, ref: < "system"."request_types"."id"]
+  "request_data" jsonb [not null]
+  "user_ip" inet [not null]
+  "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  Indexes {
+    type_id [name: "idx_request_history_type_id"]
+    created_at [name: "idx_request_history_created_at"]
+  }
+}
