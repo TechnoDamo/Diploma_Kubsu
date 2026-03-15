@@ -1,14 +1,21 @@
 version: '3.8'
 
 services:
+  prism:
+    image: stoplight/prism:4
+    command: mock -h 0.0.0.0 /tmp/specs/comparison-service.yaml
+    ports:
+      - "8080:4010"
+    volumes:
+      - ./specs:/tmp/specs:ro
+
   swagger-ui:
     image: swaggerapi/swagger-ui:latest
     ports:
-      - "8080:8080"
+      - "8081:8080"
     environment:
       URLS: |
         [
-          {"url": "/specs/embedding-service.yaml", "name": "Embedding Service"},
           {"url": "/specs/comparison-service.yaml", "name": "Document Comparisons Service"}
         ]
     volumes:
