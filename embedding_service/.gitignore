@@ -1,4 +1,5 @@
 # Python
+worker/implementation.md
 __pycache__/
 *.py[cod]
 *$py.class

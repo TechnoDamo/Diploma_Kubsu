@@ -1,9 +1,9 @@
 general:
-  grpc_host: localhost
+  grpc_host: 0.0.0.0
   grpc_port: 50051
   grpc_max_workers: 4
-  grpc_max_message_length: 10
-  cache_dir: some appropriate dir
+  grpc_max_message_length: 104857600
+  cache_dir: /app/models
   trust_remote_code: true
   device: cuda
   dtype: float32

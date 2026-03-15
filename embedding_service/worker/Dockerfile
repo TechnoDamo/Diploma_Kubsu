@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
 
 # Set working directory
 WORKDIR /app
+ENV PYTHONPATH=/app
 
 # Copy requirements and install dependencies
 COPY requirements.txt ./
