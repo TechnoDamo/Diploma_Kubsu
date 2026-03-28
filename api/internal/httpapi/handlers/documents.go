@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"mimir/api/internal/modules/documents"
 )
 
@@ -53,6 +54,7 @@ func (h Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, documents.ErrProjectNotFound):
 			respondError(w, http.StatusNotFound, "PROJECT_NOT_FOUND", "Project does not exist.")
 		default:
+			h.logInternalError(r, "list documents", err, "project_id", projectID, "page", page, "limit", limit)
 			respondError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Unexpected internal server error.")
 		}
 		return
@@ -117,10 +119,21 @@ func (h Handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, documents.ErrMissingUploadFile):
 			respondValidationError(w, []validationIssue{{Field: "file", Message: "must be provided"}})
 		default:
+			h.logInternalError(r, "upload document", err, "project_id", projectID, "filename", header.Filename, "mime_type", mimeType)
 			respondError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Unexpected internal server error.")
 		}
 		return
 	}
+
+	h.app.Logger.Info(
+		"document uploaded via http",
+		"request_id", middleware.GetReqID(r.Context()),
+		"project_id", projectID,
+		"document_id", document.ID,
+		"name", document.Name,
+		"mime_type", document.MIMEType,
+		"size_bytes", document.SizeBytes,
+	)
 
 	respondJSON(w, http.StatusCreated, mapDocumentResponse(document))
 }
@@ -137,6 +150,7 @@ func (h Handler) GetDocument(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, documents.ErrDocumentNotFound):
 			respondError(w, http.StatusNotFound, "DOCUMENT_NOT_FOUND", "Document does not exist in this project.")
 		default:
+			h.logInternalError(r, "get document", err, "project_id", projectID, "document_id", documentID)
 			respondError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Unexpected internal server error.")
 		}
 		return
@@ -161,6 +175,7 @@ func (h Handler) DeleteDocument(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, documents.ErrProjectReindexing):
 			respondError(w, http.StatusConflict, "PROJECT_REINDEXING", "Project is temporarily unavailable because reindexing is in progress.")
 		default:
+			h.logInternalError(r, "delete document", err, "project_id", projectID, "document_id", documentID)
 			respondError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Unexpected internal server error.")
 		}
 		return
@@ -183,6 +198,7 @@ func (h Handler) GetDocumentText(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, documents.ErrDocumentNotReady):
 			respondError(w, http.StatusConflict, "DOCUMENT_NOT_READY", "Document text is not available yet because processing is not finished.")
 		default:
+			h.logInternalError(r, "get document text", err, "project_id", projectID, "document_id", documentID)
 			respondError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Unexpected internal server error.")
 		}
 		return
@@ -206,6 +222,7 @@ func (h Handler) GetDocumentContent(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, documents.ErrDocumentNotFound):
 			respondError(w, http.StatusNotFound, "DOCUMENT_NOT_FOUND", "Document does not exist in this project.")
 		default:
+			h.logInternalError(r, "get document content", err, "project_id", projectID, "document_id", documentID)
 			respondError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Unexpected internal server error.")
 		}
 		return
@@ -252,6 +269,8 @@ func detectMimeType(filename string) string {
 		return "application/pdf"
 	case ".md":
 		return "text/markdown"
+	case ".html", ".htm":
+		return "text/html"
 	case ".doc":
 		return "application/msword"
 	case ".docx":

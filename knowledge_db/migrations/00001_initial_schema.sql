@@ -196,7 +196,7 @@ CREATE INDEX idx_embeddings_model_id
 CREATE TABLE analysis.analysis_jobs (
     id BIGSERIAL PRIMARY KEY,
     project_id BIGINT NOT NULL REFERENCES documents.projects(id) ON DELETE CASCADE,
-    base_document_id BIGINT NOT NULL REFERENCES documents.documents(id),
+    base_document_id BIGINT NOT NULL REFERENCES documents.documents(id) ON DELETE CASCADE,
     project_index_config_id BIGINT NOT NULL REFERENCES documents.project_index_configs(id),
     status VARCHAR(32) NOT NULL CHECK (status IN ('queued', 'processing', 'completed', 'failed')),
     requested_target_document_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -217,7 +217,7 @@ CREATE INDEX idx_analysis_jobs_base_document_id
 
 CREATE TABLE analysis.analysis_job_targets (
     analysis_job_id BIGINT NOT NULL REFERENCES analysis.analysis_jobs(id) ON DELETE CASCADE,
-    document_id BIGINT NOT NULL REFERENCES documents.documents(id),
+    document_id BIGINT NOT NULL REFERENCES documents.documents(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (analysis_job_id, document_id)
 );

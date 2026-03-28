@@ -34,6 +34,7 @@ var supportedMIMETypes = map[string]struct{}{
 	"application/pdf": {},
 	"text/plain":      {},
 	"text/markdown":   {},
+	"text/html":       {},
 	"application/vnd.openxmlformats-officedocument.wordprocessingml.document": {},
 }
 
@@ -441,7 +442,31 @@ func (s service) Delete(ctx context.Context, projectID, documentID int64) error 
 		return ErrDocumentBusy
 	}
 
-	commandTag, err := s.db.Exec(ctx, `
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin delete document tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM analysis.analysis_job_targets AS t
+		USING analysis.analysis_jobs AS j
+		WHERE t.analysis_job_id = j.id
+		  AND t.document_id = $1
+		  AND j.status IN ('completed', 'failed')
+	`, documentID); err != nil {
+		return fmt.Errorf("delete completed analysis target references: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM analysis.analysis_jobs
+		WHERE base_document_id = $1
+		  AND status IN ('completed', 'failed')
+	`, documentID); err != nil {
+		return fmt.Errorf("delete completed analysis jobs: %w", err)
+	}
+
+	commandTag, err := tx.Exec(ctx, `
 		DELETE FROM documents.documents
 		WHERE project_id = $1
 		  AND id = $2
@@ -451,6 +476,10 @@ func (s service) Delete(ctx context.Context, projectID, documentID int64) error 
 	}
 	if commandTag.RowsAffected() == 0 {
 		return ErrDocumentNotFound
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit delete document tx: %w", err)
 	}
 
 	if err := s.storage.Delete(document.FilePath); err != nil {

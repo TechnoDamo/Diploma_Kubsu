@@ -28,7 +28,7 @@ Table "embeddings"."embeddings" {
 Table "analysis"."analysis_jobs" {
   "id" bigint [pk, not null, increment]
   "project_id" bigint [not null, ref: > "documents"."projects"."id"]
-  "base_document_id" bigint [not null, ref: > "documents"."documents"."id"]
+  "base_document_id" bigint [not null, ref: > "documents"."documents"."id", delete: cascade]
   "project_index_config_id" bigint [not null, ref: > "documents"."project_index_configs"."id"]
   "status" varchar(32) [not null]
   "requested_target_document_ids" jsonb [not null]
@@ -48,7 +48,7 @@ Table "analysis"."analysis_jobs" {
 
 Table "analysis"."analysis_job_targets" {
   "analysis_job_id" bigint [not null, ref: > "analysis"."analysis_jobs"."id"]
-  "document_id" bigint [not null, ref: > "documents"."documents"."id"]
+  "document_id" bigint [not null, ref: > "documents"."documents"."id", delete: cascade]
   "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
 
   Indexes {

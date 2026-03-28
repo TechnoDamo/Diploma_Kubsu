@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 
 	"mimir/api/internal/app"
 )
@@ -121,4 +122,16 @@ func parsePagination(r *http.Request) (page int, limit int, err error) {
 	}
 
 	return page, limit, nil
+}
+
+func (h Handler) logInternalError(r *http.Request, operation string, err error, keyvals ...any) {
+	attrs := []any{
+		"request_id", middleware.GetReqID(r.Context()),
+		"method", r.Method,
+		"path", r.URL.Path,
+		"operation", operation,
+		"error", err,
+	}
+	attrs = append(attrs, keyvals...)
+	h.app.Logger.Error("http handler failed", attrs...)
 }
