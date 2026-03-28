@@ -11,7 +11,7 @@ type Config struct {
 
 	LogLevel string `env:"LOG_LEVEL" env-default:"INFO"`
 
-	EnableLocalFallbacks bool `env:"ENABLE_LOCAL_FALLBACKS" env-default:"true"`
+	EnableLocalFallbacks bool `env:"ENABLE_LOCAL_FALLBACKS" env-default:"false"`
 
 	HTTP HTTPConfig
 
@@ -29,6 +29,8 @@ type Config struct {
 	LLM LLMConfig
 
 	ProjectIndexDefaults ProjectIndexDefaultsConfig `env-prefix:"PROJECT_INDEX_DEFAULTS_"`
+
+	DependencyStartupChecksEnabled bool `env:"DEPENDENCY_STARTUP_CHECKS_ENABLED" env-default:"true"`
 
 	QueryRewriteDefaultEnabled    bool    `env:"QUERY_REWRITE_DEFAULT_ENABLED" env-default:"true"`
 	RAGRetrievalTopK              int     `env:"RAG_RETRIEVAL_TOP_K" env-default:"8"`

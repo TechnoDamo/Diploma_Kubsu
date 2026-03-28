@@ -18,6 +18,6 @@ function readBooleanEnv(name: string, fallback: boolean): boolean {
 }
 
 export const env = {
-  apiBaseUrl: readEnv("VITE_API_BASE_URL", "http://localhost:8080/api/v1"),
+  apiBaseUrl: readEnv("VITE_API_BASE_URL", "/api/v1"),
   enableMocks: readBooleanEnv("VITE_ENABLE_MOCKS", false),
 };

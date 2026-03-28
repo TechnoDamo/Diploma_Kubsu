@@ -27,8 +27,12 @@ That compose file starts:
 3. `api`
 4. `worker`
 
-The default compose baseline is intentionally able to run without Docling, TEI, or a real LLM provider by enabling local fallbacks.
-Its external-service URLs are placeholder internal hostnames, so the expected smoke-test behavior is fallback-backed unless you wire real provider containers or remote endpoints.
+The compose stack is now strict by default:
+
+- `DEPENDENCY_STARTUP_CHECKS_ENABLED=true`
+- `ENABLE_LOCAL_FALLBACKS=false`
+
+That means `api` and `worker` do not start successfully unless TEI and the configured LLM model are reachable.
 
 What this baseline is good for:
 
@@ -36,13 +40,14 @@ What this baseline is good for:
 2. migration verification
 3. local file-storage verification
 4. durable job-flow verification
-5. text/plain upload and RAG smoke testing
+5. provider-backed startup verification
 
 What it is not meant to prove:
 
 1. provider-backed parsing quality
 2. provider-backed embedding quality
 3. provider-backed LLM answer quality
+4. complete functional success unless the external services are really wired and healthy
 
 ## Deployment Prerequisites
 
@@ -65,13 +70,14 @@ What it is not meant to prove:
 From the repository root:
 
 1. `cd api`
-2. Start the full backend baseline:
+2. Ensure the compose file points at reachable Docling, TEI, and LLM endpoints, or extend it with those services.
+3. Start the full backend baseline:
    `docker compose up --build -d`
-3. Check logs:
+4. Check logs:
    `docker compose logs -f postgres-vector migrator api worker`
-4. Run the smoke test:
+5. Run the smoke test:
    `bash ./scripts/smoke_test.sh`
-5. Stop the stack:
+6. Stop the stack:
    `docker compose down -v`
 
 Equivalent shortcuts are available through [`Makefile`](/Users/damir/Documents/Diploma_Kubsu/api/Makefile):
@@ -86,7 +92,7 @@ Equivalent shortcuts are available through [`Makefile`](/Users/damir/Documents/D
 If you prefer process-based local development instead of containers:
 
 1. Start PostgreSQL separately.
-2. Ensure Docling, TEI, and the configured LLM provider are running, or keep fallbacks enabled.
+2. Ensure Docling, TEI, and the configured LLM provider are running and reachable.
 3. In `api/`, copy `.env.example` to `.env`.
 4. Export the environment variables from `.env`.
 5. Start the API:
@@ -143,7 +149,7 @@ Current operational checks:
    `GET /healthz`
 2. structured logs from both `api` and `worker`
 3. PostgreSQL migration status from the `knowledge_db` package
-4. successful Docker build of the backend image
+4. successful dependency startup checks for TEI and the configured LLM model
 
 Recommended minimum deployment checks:
 
@@ -159,6 +165,4 @@ Current deployment limitations:
 
 1. generated `sqlc` and `oapi-codegen` outputs are not committed yet
 2. local filesystem storage is an MVP decision, not the final long-term storage model
-3. the default compose stack validates fallback-backed behavior first, not provider-backed model quality
-4. provider-backed quality still depends on real Docling, TEI, and LLM-provider availability
-5. project reindex orchestration is not implemented yet, even though the runtime already honors the `reindexing` availability gate if that state is set in the database
+3. project reindex orchestration is not implemented yet, even though the runtime already honors the `reindexing` availability gate if that state is set in the database

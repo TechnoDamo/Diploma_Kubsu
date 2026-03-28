@@ -86,13 +86,7 @@ Default stack contents:
 - `api`
 - `worker`
 
-This compose stack is intentionally portable and does not require Docling, TEI, or a live LLM provider for a smoke test. It runs with `ENABLE_LOCAL_FALLBACKS=true`, so the verified baseline path is:
-
-- create project
-- upload `text/plain`
-- worker indexes with deterministic embedding fallback
-- query RAG
-- run contradiction analysis
+This compose stack now expects real dependency endpoints for Docling, TEI, and the configured LLM provider. Both `api` and `worker` run with `DEPENDENCY_STARTUP_CHECKS_ENABLED=true`, so startup fails fast if TEI or the LLM model are unreachable.
 
 Use:
 
@@ -104,7 +98,7 @@ make docker-logs
 make docker-down
 ```
 
-For provider-backed quality testing, point the environment at real Docling, TEI, and LLM endpoints.
+Before running the compose stack, wire reachable Docling, TEI, and LLM endpoints into the environment or adjust the compose file to point at real containers/services.
 
 ## Current State
 
@@ -117,6 +111,7 @@ This backend foundation includes:
 - startup-loaded prompt templates
 - API and worker bootstrap
 - container-first local stack and smoke-test script
+- strict dependency startup validation for TEI and the configured LLM model
 - implemented project CRUD and bootstrap index-config creation
 - implemented document upload, content, text, and deletion flows
 - implemented durable document processing and contradiction-analysis worker paths

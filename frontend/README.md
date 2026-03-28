@@ -6,8 +6,9 @@ Frontend application for the Mimir RAG system, built against the OpenAPI contrac
 
 This app is now **real-backend first**:
 
-- default mode: direct requests to the backend at `http://localhost:8080/api/v1`
+- default mode: requests go to `/api/v1` and are proxied by Vite to `http://localhost:8080`
 - optional fallback mode: MSW-based browser mocks behind `VITE_ENABLE_MOCKS=true`
+- in local Vite development, the recommended path is the built-in `/api` proxy to the Go backend on `http://localhost:8080`
 
 ## Tech Stack
 
@@ -96,6 +97,8 @@ Development with real backend:
 npm run dev
 ```
 
+With the default example env, the frontend talks to `/api/v1`, and Vite proxies that to `http://localhost:8080`. This avoids browser CORS preflight issues during local development.
+
 Development with browser mocks:
 
 ```bash
@@ -144,8 +147,9 @@ npm run preview
 
 - `VITE_API_BASE_URL`
 
-  - default: `http://localhost:8080/api/v1`
+  - default: `/api/v1`
   - base URL for the Go backend API
+  - recommended for local Vite development because `/api` is proxied to `http://localhost:8080`
 
 - `VITE_ENABLE_MOCKS`
 
@@ -153,6 +157,12 @@ npm run preview
   - when `true`, the browser starts MSW before rendering the app
 
 Example:
+
+```bash
+VITE_API_BASE_URL=/api/v1 npm run dev
+```
+
+If you intentionally want to bypass the Vite proxy and call the backend directly, you can still do:
 
 ```bash
 VITE_API_BASE_URL=http://localhost:8080/api/v1 npm run dev

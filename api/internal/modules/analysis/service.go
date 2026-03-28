@@ -22,6 +22,7 @@ var (
 	ErrProjectReindexing    = errors.New("project is reindexing")
 	ErrBaseDocumentNotReady = errors.New("base document not ready")
 	ErrJobNotFound          = errors.New("analysis job not found")
+	ErrLLMUnavailable       = errors.New("llm dependency unavailable")
 )
 
 type Service interface {
@@ -125,6 +126,10 @@ func (s service) StartContradictionAnalysis(ctx context.Context, input StartCont
 	}
 	if !baseDocumentReady {
 		return AcceptedJob{}, ErrBaseDocumentNotReady
+	}
+
+	if err := s.llm.CheckAvailability(ctx); err != nil {
+		return AcceptedJob{}, fmt.Errorf("%w: %v", ErrLLMUnavailable, err)
 	}
 
 	scope, warningMessage, err := s.resolveScope(ctx, input.ProjectID, input.BaseDocumentID, input.TargetDocumentIDs)
@@ -371,11 +376,12 @@ func (s service) processClaimedJob(ctx context.Context, jobID, projectID, baseDo
 		})
 
 		summary, err := s.summarizeTargetContradictions(ctx, projectContext, target.Name, contradictions)
-		if err != nil && !s.cfg.EnableLocalFallbacks {
+		if err != nil {
 			return nil, err
 		}
-		if strings.TrimSpace(summary) == "" {
-			summary = buildFallbackSummary(target.Name, contradictions)
+		summary = strings.TrimSpace(summary)
+		if summary == "" {
+			return nil, fmt.Errorf("llm contradiction summary returned empty text for target document %d", target.ID)
 		}
 
 		results = append(results, ContradictionResult{
@@ -459,28 +465,22 @@ func (s service) findCandidatePairs(ctx context.Context, baseDocumentID, targetD
 }
 
 func (s service) evaluatePair(ctx context.Context, projectContext projectPromptContext, baseText, targetText string, baseOrder, targetOrder int) (Contradiction, bool, error) {
-	if response, err := s.askLLM(ctx, projectContext, baseText, targetText); err == nil {
-		if response.IsContradiction {
-			return Contradiction{
-				BaseText:         baseText,
-				TargetText:       targetText,
-				Confidence:       response.Confidence,
-				Explanation:      response.Explanation,
-				BaseChunkOrder:   baseOrder,
-				TargetChunkOrder: targetOrder,
-			}, true, nil
-		}
-		return Contradiction{}, false, nil
+	response, err := s.askLLM(ctx, projectContext, baseText, targetText)
+	if err != nil {
+		return Contradiction{}, false, fmt.Errorf("llm contradiction evaluation failed: %w", err)
 	}
 
-	if s.cfg.EnableLocalFallbacks {
-		if contradiction, ok := heuristicContradiction(baseText, targetText, baseOrder, targetOrder); ok {
-			return contradiction, true, nil
-		}
-		return Contradiction{}, false, nil
+	if response.IsContradiction {
+		return Contradiction{
+			BaseText:         baseText,
+			TargetText:       targetText,
+			Confidence:       response.Confidence,
+			Explanation:      response.Explanation,
+			BaseChunkOrder:   baseOrder,
+			TargetChunkOrder: targetOrder,
+		}, true, nil
 	}
-
-	return Contradiction{}, false, fmt.Errorf("llm contradiction evaluation failed")
+	return Contradiction{}, false, nil
 }
 
 type llmJudgement struct {
@@ -502,7 +502,7 @@ func (s service) askLLM(ctx context.Context, projectContext projectPromptContext
 		JSONMode:     true,
 	})
 	if err != nil {
-		return llmJudgement{}, err
+		return llmJudgement{}, fmt.Errorf("call llm for contradiction judgement: %w", err)
 	}
 
 	var judgement llmJudgement
@@ -542,76 +542,10 @@ func (s service) summarizeTargetContradictions(ctx context.Context, projectConte
 		UserPrompt:   userPrompt,
 	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("call llm for contradiction summary: %w", err)
 	}
 
 	return strings.TrimSpace(response.Text), nil
-}
-
-func heuristicContradiction(baseText, targetText string, baseOrder, targetOrder int) (Contradiction, bool) {
-	baseLower := strings.ToLower(baseText)
-	targetLower := strings.ToLower(targetText)
-
-	oppositeNegation := (strings.Contains(baseLower, " not ") || strings.Contains(baseLower, " no ")) !=
-		(strings.Contains(targetLower, " not ") || strings.Contains(targetLower, " no "))
-	containsBothMustAndMustNot := (strings.Contains(baseLower, "must") && strings.Contains(targetLower, "must not")) ||
-		(strings.Contains(targetLower, "must") && strings.Contains(baseLower, "must not"))
-
-	numericMismatch := false
-	baseNumbers := extractNumbers(baseLower)
-	targetNumbers := extractNumbers(targetLower)
-	if len(baseNumbers) > 0 && len(targetNumbers) > 0 && baseNumbers[0] != targetNumbers[0] {
-		numericMismatch = true
-	}
-
-	if !(oppositeNegation || containsBothMustAndMustNot || numericMismatch) {
-		return Contradiction{}, false
-	}
-
-	explanation := "The statements use conflicting wording."
-	if numericMismatch {
-		explanation = "The statements discuss the same topic but contain different numeric values."
-	}
-
-	return Contradiction{
-		BaseText:         baseText,
-		TargetText:       targetText,
-		Confidence:       0.55,
-		Explanation:      explanation,
-		BaseChunkOrder:   baseOrder,
-		TargetChunkOrder: targetOrder,
-	}, true
-}
-
-func buildFallbackSummary(targetDocumentName string, contradictions []Contradiction) string {
-	if len(contradictions) == 0 {
-		return ""
-	}
-
-	top := contradictions[0]
-	if len(contradictions) == 1 {
-		return fmt.Sprintf("One substantive contradiction was found with %s: %s", targetDocumentName, top.Explanation)
-	}
-
-	return fmt.Sprintf(
-		"%d substantive contradictions were found with %s. The strongest conflict is: %s",
-		len(contradictions),
-		targetDocumentName,
-		top.Explanation,
-	)
-}
-
-func extractNumbers(text string) []string {
-	fields := strings.FieldsFunc(text, func(r rune) bool {
-		return (r < '0' || r > '9') && r != '.'
-	})
-	result := make([]string, 0, len(fields))
-	for _, field := range fields {
-		if field != "" {
-			result = append(result, field)
-		}
-	}
-	return result
 }
 
 func (s service) resolveScope(ctx context.Context, projectID, baseDocumentID int64, targetDocumentIDs []int64) ([]scopedDocument, *string, error) {

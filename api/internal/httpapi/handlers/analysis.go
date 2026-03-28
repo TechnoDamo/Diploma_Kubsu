@@ -73,6 +73,8 @@ func (h Handler) StartContradictionAnalysis(w http.ResponseWriter, r *http.Reque
 			respondError(w, http.StatusConflict, "PROJECT_REINDEXING", "Project is temporarily unavailable because reindexing is in progress.")
 		case errors.Is(err, analysis.ErrBaseDocumentNotReady):
 			respondError(w, http.StatusConflict, "DOCUMENT_NOT_READY", "Base document is not indexed yet and cannot be used for contradiction analysis.")
+		case errors.Is(err, analysis.ErrLLMUnavailable):
+			respondError(w, http.StatusServiceUnavailable, "LLM_DEPENDENCY_UNAVAILABLE", "LLM service is unavailable.")
 		default:
 			respondError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Unexpected internal server error.")
 		}

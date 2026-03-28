@@ -28,6 +28,7 @@ type CompletionResponse struct {
 
 type Client interface {
 	Complete(ctx context.Context, input CompletionRequest) (CompletionResponse, error)
+	CheckAvailability(ctx context.Context) error
 }
 
 type openAICompatibleClient struct {
@@ -120,4 +121,18 @@ func (c openAICompatibleClient) Complete(ctx context.Context, input CompletionRe
 	}
 
 	return CompletionResponse{Text: payloadResponse.Choices[0].Message.Content}, nil
+}
+
+func (c openAICompatibleClient) CheckAvailability(ctx context.Context) error {
+	response, err := c.Complete(ctx, CompletionRequest{
+		SystemPrompt: "Reply with the single word OK.",
+		UserPrompt:   "Healthcheck",
+	})
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(response.Text) == "" {
+		return fmt.Errorf("llm healthcheck returned empty response")
+	}
+	return nil
 }

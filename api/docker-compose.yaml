@@ -50,7 +50,8 @@ services:
     environment:
       APP_ENV: container
       LOG_LEVEL: INFO
-      ENABLE_LOCAL_FALLBACKS: "true"
+      ENABLE_LOCAL_FALLBACKS: "false"
+      DEPENDENCY_STARTUP_CHECKS_ENABLED: "true"
       HTTP_HOST: 0.0.0.0
       HTTP_PORT: 8080
       HTTP_PUBLIC_BASE_URL: http://localhost:8080
@@ -108,7 +109,8 @@ services:
     environment:
       APP_ENV: container
       LOG_LEVEL: INFO
-      ENABLE_LOCAL_FALLBACKS: "true"
+      ENABLE_LOCAL_FALLBACKS: "false"
+      DEPENDENCY_STARTUP_CHECKS_ENABLED: "true"
       HTTP_HOST: 0.0.0.0
       HTTP_PORT: 8080
       HTTP_PUBLIC_BASE_URL: http://localhost:8080

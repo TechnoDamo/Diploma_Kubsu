@@ -303,15 +303,7 @@ func (s service) embedTexts(ctx context.Context, texts []string, dimensions int)
 	if err == nil {
 		return embeddings, nil
 	}
-	if !s.cfg.EnableLocalFallbacks {
-		return nil, err
-	}
-
-	fallback := make([][]float32, 0, len(texts))
-	for _, text := range texts {
-		fallback = append(fallback, support.DeterministicEmbedding(text, dimensions))
-	}
-	return fallback, nil
+	return nil, fmt.Errorf("embed document chunks with tei: %w", err)
 }
 
 func guessLanguage(text string) *string {

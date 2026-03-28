@@ -184,4 +184,4 @@ Projects can override selected RAG runtime values in the database without changi
 That split is intentional:
 
 - project config owns document indexing and project-specific retrieval behavior
-- process env owns provider wiring and global fallbacks
+- process env owns provider wiring, dependency startup checks, and global runtime defaults

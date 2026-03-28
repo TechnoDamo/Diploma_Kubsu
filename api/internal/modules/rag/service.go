@@ -20,6 +20,8 @@ import (
 var (
 	ErrProjectNotFound   = errors.New("project not found")
 	ErrProjectReindexing = errors.New("project is reindexing")
+	ErrTEIUnavailable    = errors.New("tei dependency unavailable")
+	ErrLLMUnavailable    = errors.New("llm dependency unavailable")
 )
 
 type Service interface {
@@ -109,7 +111,10 @@ func (s service) Query(ctx context.Context, input QueryInput) (QueryResult, erro
 	effectiveQuestion := input.Question
 	if settings.QueryRewriteEnabled {
 		rewritten, err := s.rewriteQuestion(ctx, input.Question, settings.projectPromptContext)
-		if err == nil && strings.TrimSpace(rewritten) != "" {
+		if err != nil {
+			return QueryResult{}, err
+		}
+		if strings.TrimSpace(rewritten) != "" {
 			effectiveQuestion = rewritten
 		}
 	}
@@ -166,7 +171,11 @@ func (s service) Query(ctx context.Context, input QueryInput) (QueryResult, erro
 
 	answer := s.buildFallbackAnswer(citations)
 	if len(contextParts) > 0 {
-		if llmAnswer, err := s.answerWithLLM(ctx, input.Question, effectiveQuestion, settings.projectPromptContext, contextParts); err == nil && strings.TrimSpace(llmAnswer) != "" {
+		llmAnswer, err := s.answerWithLLM(ctx, input.Question, effectiveQuestion, settings.projectPromptContext, contextParts)
+		if err != nil {
+			return QueryResult{}, err
+		}
+		if strings.TrimSpace(llmAnswer) != "" {
 			answer = llmAnswer
 		}
 	}
@@ -358,7 +367,7 @@ func (s service) rewriteQuestion(ctx context.Context, question string, projectCo
 		),
 	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("%w: %v", ErrLLMUnavailable, err)
 	}
 	return strings.TrimSpace(response.Text), nil
 }
@@ -368,13 +377,10 @@ func (s service) embedText(ctx context.Context, text string, dimension int) ([]f
 	if err == nil && len(vectors) > 0 {
 		return vectors[0], nil
 	}
-	if s.cfg.EnableLocalFallbacks {
-		return support.DeterministicEmbedding(text, dimension), nil
-	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", ErrTEIUnavailable, err)
 	}
-	return nil, fmt.Errorf("tei returned no embeddings")
+	return nil, fmt.Errorf("%w: tei returned no embeddings", ErrTEIUnavailable)
 }
 
 func (s service) answerWithLLM(ctx context.Context, originalQuestion, rewrittenQuestion string, projectContext projectPromptContext, contextParts []string) (string, error) {
@@ -394,10 +400,7 @@ func (s service) answerWithLLM(ctx context.Context, originalQuestion, rewrittenQ
 		UserPrompt:   userPrompt,
 	})
 	if err != nil {
-		if s.cfg.EnableLocalFallbacks {
-			return "", nil
-		}
-		return "", err
+		return "", fmt.Errorf("%w: %v", ErrLLMUnavailable, err)
 	}
 	return strings.TrimSpace(response.Text), nil
 }

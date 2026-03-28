@@ -21,7 +21,9 @@ set +a
 - `LOG_LEVEL`
   Structured log verbosity. Typical values: `DEBUG`, `INFO`, `WARN`, `ERROR`.
 - `ENABLE_LOCAL_FALLBACKS`
-  Enables development fallbacks when TEI or the configured LLM provider are unavailable.
+  Enables only limited UTF-8 text parsing fallback when Docling fails on textual content. It does not replace TEI embeddings or LLM completions.
+- `DEPENDENCY_STARTUP_CHECKS_ENABLED`
+  When enabled, both `api` and `worker` fail startup if TEI or the configured LLM model are unreachable.
 
 ## HTTP Server
 

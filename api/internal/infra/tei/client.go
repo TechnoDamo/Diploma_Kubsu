@@ -28,6 +28,22 @@ func (c Client) BaseURL() string {
 	return c.baseURL
 }
 
+func (c Client) CheckAvailability(ctx context.Context, dimensions int) error {
+	if strings.TrimSpace(c.baseURL) == "" {
+		return fmt.Errorf("tei base url is empty")
+	}
+
+	vectors, err := c.Embed(ctx, []string{"healthcheck"}, dimensions)
+	if err != nil {
+		return err
+	}
+	if len(vectors) != 1 {
+		return fmt.Errorf("tei availability check returned %d embeddings", len(vectors))
+	}
+
+	return nil
+}
+
 func (c Client) Embed(ctx context.Context, inputs []string, dimensions int) ([][]float32, error) {
 	if len(inputs) == 0 {
 		return nil, fmt.Errorf("embed inputs must not be empty")

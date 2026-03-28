@@ -9,9 +9,8 @@ The backend should be tested at three levels.
 Focus on deterministic logic that does not require infrastructure:
 
 - chunking behavior
-- vector formatting and deterministic fallback embeddings
+- vector formatting
 - small request/response mapping helpers
-- contradiction heuristics used for local fallback mode
 
 Run locally:
 
@@ -51,19 +50,7 @@ These tests should run against the real runtime shape:
 - PostgreSQL
 - Docling
 - TEI
-- optionally the real LLM provider
-
-## Fallback Mode
-
-The backend supports local fallbacks through `ENABLE_LOCAL_FALLBACKS=true`.
-
-This is useful for development and partial end-to-end verification when external model services are unavailable:
-
-- deterministic fallback embeddings replace TEI on failure
-- simple fallback answer generation replaces LLM output on failure
-- heuristic contradiction detection replaces LLM contradiction judgement on failure
-
-Fallback mode is a development aid, not a replacement for provider-backed verification.
+- the real LLM provider
 
 ## Containerized Verification
 
@@ -77,7 +64,7 @@ docker compose logs -f postgres-vector migrator api worker
 docker compose down -v
 ```
 
-That compose stack uses fallback-friendly placeholder URLs for Docling, TEI, and the LLM provider. For the default smoke test, use `text/plain` uploads and expect fallback-backed embeddings and LLM behavior.
+That compose stack no longer validates fake fallback behavior. It should be run only when Docling, TEI, and the configured LLM provider are genuinely reachable, because startup checks now fail fast otherwise.
 
 If you only want image-level compilation and unit-test validation:
 

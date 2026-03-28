@@ -12,8 +12,6 @@
 8. The worker parses the file through Docling, creates chunks, generates embeddings through TEI, writes chunk and embedding rows, and marks the document `indexed`.
 9. On failure, the worker marks the job `failed` and the document `failed`.
 
-For the container smoke-test baseline, this path is exercised with `text/plain` uploads so parsing does not require Docling, and embedding falls back locally if TEI is unavailable.
-
 For provider-backed parsing today:
 
 - `application/pdf` and `application/vnd.openxmlformats-officedocument.wordprocessingml.document` are sent to Docling for text extraction

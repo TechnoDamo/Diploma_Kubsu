@@ -55,6 +55,10 @@ func (h Handler) QueryRAG(w http.ResponseWriter, r *http.Request) {
 			respondError(w, http.StatusNotFound, "PROJECT_NOT_FOUND", "Project does not exist.")
 		case errors.Is(err, rag.ErrProjectReindexing):
 			respondError(w, http.StatusConflict, "PROJECT_REINDEXING", "Project is temporarily unavailable because reindexing is in progress.")
+		case errors.Is(err, rag.ErrTEIUnavailable):
+			respondError(w, http.StatusServiceUnavailable, "EMBEDDING_DEPENDENCY_UNAVAILABLE", "Embedding service is unavailable.")
+		case errors.Is(err, rag.ErrLLMUnavailable):
+			respondError(w, http.StatusServiceUnavailable, "LLM_DEPENDENCY_UNAVAILABLE", "LLM service is unavailable.")
 		default:
 			respondError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Unexpected internal server error.")
 		}
