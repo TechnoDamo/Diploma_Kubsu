@@ -12,7 +12,7 @@ export function useProjects(page = 1, limit = 20) {
   });
 }
 
-export function useProject(projectId: string | undefined) {
+export function useProject(projectId: ProjectId | undefined) {
   return useQuery({
     queryKey: ["project", projectId],
     queryFn: () => getProject(projectId!),

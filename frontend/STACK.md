@@ -1,6 +1,6 @@
 # Frontend Stack
 
-This frontend will be built with a pragmatic stack optimized for a typed API contract, mock-server development, and incremental UI growth.
+This frontend uses a pragmatic stack optimized for a live backend contract, async job polling, and a deliberately minimal high-contrast UI.
 
 ## Core
 
@@ -21,7 +21,7 @@ This frontend will be built with a pragmatic stack optimized for a typed API con
 ## API Layer
 
 - OpenAPI-driven frontend contracts
-  The frontend should align with `api-docs-swagger/specs/comparison-service.yaml`.
+  The frontend should align with `api-docs-swagger/specs/mimir-rag-api.yaml`.
 - Typed API client
   A small request layer will handle JSON requests, file uploads, blob downloads, and error normalization.
 - `Zod` if needed
@@ -29,21 +29,21 @@ This frontend will be built with a pragmatic stack optimized for a typed API con
 
 ## Styling
 
-- `CSS Modules`
-  Scoped styles without the overhead or visual drift that often comes with utility-first defaults.
+- Global CSS design system
+  A small handwritten token layer is enough for the current app and keeps the look controlled.
 - Design tokens
-  Shared variables for spacing, color, typography, borders, and layout rhythm.
+  Shared variables for color, typography, spacing, borders, and glow treatment.
 
 ## Mocking
 
 - `MSW`
-  Mock Service Worker for realistic frontend development before the backend is ready.
+  Optional fallback mode only, not the primary development path.
 
-Why `MSW`:
+Why it still exists:
 
-- lets the frontend behave as if it is calling a real backend
-- supports dynamic scenarios like polling, delayed processing, and error states
-- can later be replaced without rewriting UI code
+- gives a controlled fallback when backend work is unstable
+- keeps the request layer decoupled from transport details
+- does not define the default runtime anymore
 
 ## Architecture Direction
 
@@ -63,7 +63,8 @@ Principles:
 - keep server state in query hooks, not global stores
 - keep route state in the URL where possible
 - model document processing and analysis jobs as explicit UI states
-- build against the mock server exactly as if it were production
+- build against the real backend contract first
+- keep mocks as an opt-in switch, not the default assumption
 
 ## First Implementation Targets
 
@@ -73,3 +74,9 @@ Principles:
 4. Document preview and extracted text states
 5. RAG query interface
 6. Contradiction analysis flow
+
+## Operational Notes
+
+- `VITE_API_BASE_URL` points the app at the Go backend.
+- `VITE_ENABLE_MOCKS=true` enables MSW before React mounts.
+- The frontend is intentionally typed against integer IDs and the current backend response shapes, not the old prefixed mock identifiers.

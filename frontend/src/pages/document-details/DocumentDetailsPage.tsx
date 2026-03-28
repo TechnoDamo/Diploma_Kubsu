@@ -6,13 +6,14 @@ import {
   useDocumentText,
 } from "../../features/documents/documents.queries";
 import { readApiErrorMessage, isApiError } from "../../shared/api/errors";
+import { parseRouteId } from "../../shared/lib/ids";
 import type { DocumentId, ProjectId } from "../../shared/types/api";
 import { AppShell } from "../../shared/ui/AppShell";
 
 export function DocumentDetailsPage() {
   const { projectId, documentId } = useParams();
-  const typedProjectId = projectId as ProjectId | undefined;
-  const typedDocumentId = documentId as DocumentId | undefined;
+  const typedProjectId = parseRouteId(projectId) as ProjectId | undefined;
+  const typedDocumentId = parseRouteId(documentId) as DocumentId | undefined;
 
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 
@@ -22,8 +23,24 @@ export function DocumentDetailsPage() {
 
   const textPending = useMemo(() => {
     if (!documentTextQuery.isError) return false;
-    return isApiError(documentTextQuery.error) && documentTextQuery.error.code === "DOCUMENT_NOT_READY";
+    return (
+      isApiError(documentTextQuery.error) && documentTextQuery.error.code === "DOCUMENT_NOT_READY"
+    );
   }, [documentTextQuery.error, documentTextQuery.isError]);
+
+  if (!typedProjectId || !typedDocumentId) {
+    return (
+      <AppShell
+        title="Invalid Document Route"
+        subtitle="The requested document path is malformed."
+      >
+        <section className="panel">
+          <p className="error">Project ID and document ID must both be positive integers.</p>
+          <Link to="/projects">Return to projects</Link>
+        </section>
+      </AppShell>
+    );
+  }
 
   useEffect(() => {
     if (documentQuery.data?.status === "indexed") {
@@ -54,12 +71,29 @@ export function DocumentDetailsPage() {
   return (
     <AppShell
       title={documentQuery.data?.name ?? "Document"}
-      subtitle="Metadata, processing status, extracted text, and original content access."
+      subtitle="Inspect document state, reconstructed text, and original content while the backend indexing pipeline progresses."
     >
-      <section className="panel">
-        <p>
-          <Link to={`/projects/${typedProjectId}`}>Back to project</Link>
-        </p>
+      <section className="hero-bar">
+        <Link className="pill pill--ghost" to={`/projects/${typedProjectId}`}>
+          Back to project
+        </Link>
+        {documentQuery.data && (
+          <>
+            <span className="pill">#{documentQuery.data.id}</span>
+            <span className="pill">{documentQuery.data.mime_type}</span>
+            <span className="pill">{documentQuery.data.status}</span>
+          </>
+        )}
+      </section>
+
+      <section className="page-grid page-grid--two-up">
+        <section className="panel panel--glow">
+          <div className="section-head">
+            <div>
+              <span className="section-kicker">Metadata</span>
+              <h2>Document status</h2>
+            </div>
+          </div>
         {documentQuery.isLoading && <p className="muted">Loading document...</p>}
         {documentQuery.isError && (
           <p className="error">
@@ -68,15 +102,24 @@ export function DocumentDetailsPage() {
         )}
         {documentQuery.data && (
           <>
-            <h2>Metadata</h2>
             <div className="chips">
               <span>{documentQuery.data.status}</span>
               <span>{documentQuery.data.mime_type}</span>
               <span>{Math.round(documentQuery.data.size_bytes / 1024)} KB</span>
             </div>
             <p className="muted">ID: {documentQuery.data.id}</p>
+            <p className="muted">
+              Last updated {new Date(documentQuery.data.updated_at).toLocaleString()}
+            </p>
+            {documentQuery.data.status === "failed" && (
+              <p className="warning">
+                Processing failed. This often means the parser or downstream indexing pipeline
+                rejected the file.
+              </p>
+            )}
             <button
               type="button"
+              className="btn-secondary"
               onClick={() => void documentQuery.refetch()}
               disabled={documentQuery.isFetching}
             >
@@ -84,10 +127,15 @@ export function DocumentDetailsPage() {
             </button>
           </>
         )}
-      </section>
+        </section>
 
-      <section className="panel">
-        <h2>Extracted Text</h2>
+        <section className="panel">
+          <div className="section-head">
+            <div>
+              <span className="section-kicker">Text view</span>
+              <h2>Extracted text</h2>
+            </div>
+          </div>
         {documentTextQuery.isLoading && <p className="muted">Loading extracted text...</p>}
         {textPending && (
           <p className="muted">
@@ -104,20 +152,28 @@ export function DocumentDetailsPage() {
         )}
         <button
           type="button"
+          className="btn-secondary"
           onClick={() => void documentTextQuery.refetch()}
           disabled={documentTextQuery.isFetching}
         >
           {documentTextQuery.isFetching ? "Checking..." : "Check text availability"}
         </button>
+        </section>
       </section>
 
       <section className="panel">
-        <h2>Original Content</h2>
+        <div className="section-head">
+          <div>
+            <span className="section-kicker">Source file</span>
+            <h2>Original content</h2>
+          </div>
+        </div>
         <p className="muted">
           This uses `/content` and downloads the raw file as a browser object URL.
         </p>
         <button
           type="button"
+          className="btn-secondary"
           onClick={() => void documentContentQuery.refetch()}
           disabled={documentContentQuery.isFetching}
         >
@@ -130,7 +186,7 @@ export function DocumentDetailsPage() {
         )}
         {downloadUrl && (
           <p>
-            <a href={downloadUrl} download={documentQuery.data?.name || "document"}>
+            <a className="text-link" href={downloadUrl} download={documentQuery.data?.name || "document"}>
               Download file
             </a>
           </p>

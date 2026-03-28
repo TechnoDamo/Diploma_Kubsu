@@ -1,6 +1,6 @@
-export type ProjectId = `proj_${string}`;
-export type DocumentId = `doc_${string}`;
-export type JobId = `job_${string}`;
+export type ProjectId = number;
+export type DocumentId = number;
+export type JobId = number;
 
 export type Project = {
   id: ProjectId;
@@ -8,7 +8,7 @@ export type Project = {
   description?: string;
   document_count: number;
   created_at: string;
-  updated_at?: string;
+  updated_at: string;
 };
 
 export type Paginated<T> = {
@@ -35,7 +35,7 @@ export type Document = {
   mime_type: string;
   status: DocumentStatus;
   created_at: string;
-  updated_at?: string;
+  updated_at: string;
 };
 
 export type DocumentListResponse = Paginated<Document>;
@@ -58,6 +58,7 @@ export type Citation = {
 
 export type RagQueryResponse = {
   answer: string;
+  warning_message?: string;
   citations: Citation[];
 };
 
@@ -71,22 +72,31 @@ export type AnalysisJobStatus = "queued" | "processing" | "completed" | "failed"
 export type AnalysisJobAcceptedResponse = {
   job_id: JobId;
   status: AnalysisJobStatus;
+  poll_url: string;
+  warning_message?: string;
 };
 
 export type Contradiction = {
   base_text: string;
   target_text: string;
   confidence: number;
+  explanation: string;
+  base_chunk_order: number;
+  target_chunk_order: number;
 };
 
 export type ContradictionResult = {
   target_document_id: DocumentId;
+  target_document_name: string;
+  summary: string;
   contradictions: Contradiction[];
 };
 
 export type ContradictionAnalysisResponse = {
   job_id: JobId;
   status: AnalysisJobStatus;
+  poll_url?: string;
+  warning_message?: string;
   results?: ContradictionResult[];
   error_message?: string;
 };

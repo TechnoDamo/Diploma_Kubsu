@@ -2,12 +2,12 @@
 
 Frontend application for the Mimir RAG system, built against the OpenAPI contract in:
 
-- `../api-docs-swagger/specs/comparison-service.yaml`
+- `../api-docs-swagger/specs/mimir-rag-api.yaml`
 
-This app is implemented to work in two modes:
+This app is now **real-backend first**:
 
-- real API mode (backend at `http://localhost:8080/api/v1`)
-- mock API mode (MSW in-browser simulation of all contract endpoints)
+- default mode: direct requests to the backend at `http://localhost:8080/api/v1`
+- optional fallback mode: MSW-based browser mocks behind `VITE_ENABLE_MOCKS=true`
 
 ## Tech Stack
 
@@ -16,7 +16,7 @@ This app is implemented to work in two modes:
 - Vite
 - React Router
 - TanStack Query
-- MSW (Mock Service Worker)
+- MSW (optional fallback switch only)
 
 ## Implemented Features
 
@@ -38,7 +38,14 @@ This app is implemented to work in two modes:
 - Contradiction analysis
   - start async job
   - job polling (`queued -> processing -> completed/failed`)
-  - completed result rendering and failed error rendering
+  - target-level summary rendering and failed error rendering
+
+## Visual Direction
+
+- black / charcoal operating-console layout
+- restrained neon cyan + green accents
+- real-time status emphasis for indexing and async jobs
+- live-backend oriented UX with clear failure states
 
 ## Project Structure
 
@@ -69,16 +76,16 @@ Install dependencies:
 npm install
 ```
 
-Create MSW service worker file (one-time):
+Optional: create an env file from the example:
+
+```bash
+cp .env.example .env
+```
+
+Mock mode only needs the service worker if you intend to use it:
 
 ```bash
 npx msw init public --save
-```
-
-Or run both in one step:
-
-```bash
-make setup
 ```
 
 ## Run
@@ -89,7 +96,7 @@ Development with real backend:
 npm run dev
 ```
 
-Development with mock server in browser:
+Development with browser mocks:
 
 ```bash
 npm run mock
@@ -100,6 +107,12 @@ Makefile equivalents:
 ```bash
 make dev
 make mock
+```
+
+The `mock` script works because `.env.mock` sets:
+
+```bash
+VITE_ENABLE_MOCKS=true
 ```
 
 Build:
@@ -129,15 +142,36 @@ npm run preview
 
 ## Environment Variables
 
-`VITE_API_BASE_URL` (optional)
+- `VITE_API_BASE_URL`
 
-- default: `http://localhost:8080/api/v1`
+  - default: `http://localhost:8080/api/v1`
+  - base URL for the Go backend API
+
+- `VITE_ENABLE_MOCKS`
+
+  - default: `false`
+  - when `true`, the browser starts MSW before rendering the app
 
 Example:
 
 ```bash
 VITE_API_BASE_URL=http://localhost:8080/api/v1 npm run dev
 ```
+
+Enable mocks explicitly:
+
+```bash
+VITE_ENABLE_MOCKS=true npm run dev
+```
+
+## Backend Expectations
+
+The frontend expects:
+
+- backend HTTP API on `http://localhost:8080/api/v1`
+- CORS enabled for `http://localhost:5173`
+- project, document, RAG, and contradiction-analysis endpoints live
+- integer IDs in route params and payloads
 
 ## Mock Behavior Notes
 
@@ -148,6 +182,7 @@ MSW handlers simulate contract-relevant backend behavior, including:
 - realistic API errors (`404`, `409`, `413`, `415`, `422`)
 - async contradiction jobs with polling lifecycle
 - RAG responses with generated citations from indexed docs
+- contradiction summaries plus raw pair-level evidence
 
 ## API Contract Alignment
 
@@ -164,16 +199,17 @@ Endpoint modules:
 
 ## Troubleshooting
 
-- If MSW requests are not intercepted:
-  - run `npx msw init public --save` again
-  - hard refresh browser after starting `npm run mock`
-- If network requests bypass mocks:
-  - confirm app is started with `npm run mock` (mode must be `mock`)
 - If CORS errors appear in real API mode:
   - confirm backend allows `http://localhost:5173`
+- If document text remains unavailable:
+  - check whether the backend document status is still `uploaded` / `processing`
+  - if it becomes `failed`, inspect the backend worker and parser logs
+- If MSW requests are not intercepted in optional mock mode:
+  - run `npx msw init public --save`
+  - hard refresh after starting `npm run mock`
 
 ## Current Limitations
 
-- No automated tests are added yet.
-- OpenAPI client generation is not wired yet; current client is manually typed.
-- Document content preview is currently download-first (not inline PDF renderer).
+- No dedicated component test suite exists yet.
+- OpenAPI code generation is not wired into the frontend build; request/response types are maintained manually.
+- Document content preview is still download-first rather than an inline renderer.

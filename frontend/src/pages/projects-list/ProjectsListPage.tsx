@@ -60,56 +60,94 @@ export function ProjectsListPage() {
 
   return (
     <AppShell
-      title="Mimir Workspace"
-      subtitle="Create projects, ingest documents, ask RAG questions, and run contradiction analysis."
+      title="Mission Control"
+      subtitle="Create research workspaces, ingest source material, and run retrieval and contradiction workflows against the live backend."
     >
-      <section className="panel">
-        <h2>Create Project</h2>
-        <form className="form-grid" onSubmit={handleCreateProject}>
-          <label>
-            Name
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              maxLength={200}
-              placeholder="Legal Contracts"
-            />
-          </label>
-          <label>
-            Description
-            <textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              maxLength={2000}
-              placeholder="Short description for this workspace."
-            />
-          </label>
-          <button type="submit" disabled={!canSubmit || createProjectMutation.isPending}>
-            {createProjectMutation.isPending ? "Creating..." : "Create project"}
-          </button>
-        </form>
-        {createError && <p className="error">{createError}</p>}
+      <section className="metrics-grid">
+        <article className="metric-card">
+          <span className="metric-card__label">Projects loaded</span>
+          <strong>{data?.total ?? 0}</strong>
+          <p>Workspaces available for ingestion and retrieval.</p>
+        </article>
+        <article className="metric-card">
+          <span className="metric-card__label">Backend mode</span>
+          <strong>Live API</strong>
+          <p>No mock data is used unless explicitly enabled through env.</p>
+        </article>
+        <article className="metric-card">
+          <span className="metric-card__label">Workflow</span>
+          <strong>Upload → Index → Query</strong>
+          <p>Use a project as the operating envelope for documents and analysis jobs.</p>
+        </article>
       </section>
 
-      <section className="panel">
-        <h2>Projects</h2>
-        {isLoading && <p className="muted">Loading projects...</p>}
-        {listError && <p className="error">{listError}</p>}
-        {!isLoading && !isError && data && data.items.length === 0 && (
-          <p className="muted">No projects yet.</p>
-        )}
-        {!isLoading && !isError && data && data.items.length > 0 && (
-          <ul className="entity-list">
-            {data.items.map((project) => (
-              <li key={project.id} className="entity-card">
-                <div>
-                  <h3>{project.name}</h3>
-                  <p>{project.description || "No description provided."}</p>
-                </div>
-                <div className="entity-meta">
-                  <span>{project.document_count} docs</span>
+      <section className="page-grid page-grid--sidebar">
+        <section className="panel panel--glow">
+          <div className="section-head">
+            <div>
+              <span className="section-kicker">Create</span>
+              <h2>New Project</h2>
+            </div>
+          </div>
+          <form className="form-grid" onSubmit={handleCreateProject}>
+            <label>
+              Name
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                maxLength={200}
+                placeholder="Corporate Governance Review"
+              />
+            </label>
+            <label>
+              Description
+              <textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                maxLength={2000}
+                placeholder="What this workspace is for, what domain it covers, and what the retrieval assistant should keep in mind."
+              />
+            </label>
+            <button type="submit" disabled={!canSubmit || createProjectMutation.isPending}>
+              {createProjectMutation.isPending ? "Creating project..." : "Create project"}
+            </button>
+          </form>
+          {createError && <p className="error">{createError}</p>}
+        </section>
+
+        <section className="panel panel--stack">
+          <div className="section-head">
+            <div>
+              <span className="section-kicker">Active workspaces</span>
+              <h2>Projects</h2>
+            </div>
+            <span className="pill">{data?.items.length ?? 0} visible</span>
+          </div>
+          {isLoading && <p className="muted">Loading projects...</p>}
+          {listError && <p className="error">{listError}</p>}
+          {!isLoading && !isError && data && data.items.length === 0 && (
+            <div className="empty-state">
+              <h3>No projects yet</h3>
+              <p>Create the first workspace to start uploading documents and running RAG.</p>
+            </div>
+          )}
+          {!isLoading && !isError && data && data.items.length > 0 && (
+            <ul className="entity-list">
+              {data.items.map((project) => (
+                <li key={project.id} className="entity-card entity-card--project">
+                  <div className="entity-card__header">
+                    <div>
+                      <h3>{project.name}</h3>
+                      <p>{project.description || "No description provided."}</p>
+                    </div>
+                    <span className="pill">#{project.id}</span>
+                  </div>
+                  <div className="entity-meta entity-meta-wrap">
+                    <span>{project.document_count} documents</span>
+                    <span>Updated {new Date(project.updated_at).toLocaleString()}</span>
+                  </div>
                   <div className="inline-actions">
-                    <Link to={`/projects/${project.id}`}>Open</Link>
+                    <Link to={`/projects/${project.id}`}>Open workspace</Link>
                     <button
                       type="button"
                       className="btn-danger"
@@ -118,11 +156,11 @@ export function ProjectsListPage() {
                       Delete
                     </button>
                   </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </section>
     </AppShell>
   );

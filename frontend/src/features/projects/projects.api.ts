@@ -18,7 +18,7 @@ export async function listProjects({
   return apiRequest<ProjectListResponse>(`/projects?page=${page}&limit=${limit}`);
 }
 
-export async function getProject(projectId: string): Promise<Project> {
+export async function getProject(projectId: ProjectId): Promise<Project> {
   return apiRequest<Project>(`/projects/${projectId}`);
 }
 
