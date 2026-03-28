@@ -24,7 +24,7 @@ type Config struct {
 	Prompts PromptConfig
 
 	Docling ExternalServiceConfig `env-prefix:"DOCLING_"`
-	TEI     TEIConfig
+	TEI     ExternalServiceConfig `env-prefix:"TEI_"`
 
 	LLM LLMConfig
 
@@ -71,11 +71,6 @@ type PromptConfig struct {
 
 type ExternalServiceConfig struct {
 	BaseURL string `env:"BASE_URL" env-required:"true"`
-}
-
-type TEIConfig struct {
-	BaseURL              string `env:"TEI_BASE_URL" env-required:"true"`
-	HealthcheckDimension int    `env:"TEI_HEALTHCHECK_DIMENSION" env-default:"1024"`
 }
 
 type LLMConfig struct {

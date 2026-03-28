@@ -80,8 +80,6 @@ This directory must be persistent in any deployment where document content must 
   Base URL for the document parsing service.
 - `TEI_BASE_URL`
   Base URL for the text-embeddings-inference service.
-- `TEI_HEALTHCHECK_DIMENSION`
-  Embedding dimension used by the startup readiness probe against TEI.
 - `LLM_PROVIDER`
   Logical provider label used for logs and future routing decisions.
 - `LLM_API_TYPE`
@@ -145,4 +143,3 @@ These should match seeded dictionary rows and the TEI model actually serving emb
 2. `PROJECT_INDEX_DEFAULTS_INGESTION_PIPELINE_ID` must exist in `documents.ingestion_pipelines`.
 3. `PROJECT_INDEX_DEFAULTS_EMBEDDING_PIPELINE_ID` must exist in `documents.embedding_pipelines`.
 4. `PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION` must match the vector size produced by the active TEI model.
-5. `TEI_HEALTHCHECK_DIMENSION` should also match a valid dimension for the active TEI model, otherwise startup readiness checks fail even if the service is up.

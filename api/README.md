@@ -68,7 +68,7 @@ oapi-codegen -config oapi-codegen.yaml ../api-docs-swagger/specs/mimir-rag-api.y
    - Docling Serve
    - TEI
    - an LLM provider reachable through the configured `LLM_API_TYPE`
-   - ensure `TEI_HEALTHCHECK_DIMENSION` and `PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION` are valid for the active TEI model
+   - ensure `PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION` is valid for the active TEI model
 4. Start the API:
    `go run ./cmd/api`
 5. Start the worker in a second terminal:

@@ -68,7 +68,6 @@ services:
       PROMPTS_DIR: /app/prompts
       DOCLING_BASE_URL: http://docling:5001
       TEI_BASE_URL: http://tei:8080
-      TEI_HEALTHCHECK_DIMENSION: 1024
       LLM_PROVIDER: deepseek
       LLM_API_TYPE: openai_compatible
       LLM_PROVIDER_BASE_URL: http://llm-provider:8000
@@ -128,7 +127,6 @@ services:
       PROMPTS_DIR: /app/prompts
       DOCLING_BASE_URL: http://docling:5001
       TEI_BASE_URL: http://tei:8080
-      TEI_HEALTHCHECK_DIMENSION: 1024
       LLM_PROVIDER: deepseek
       LLM_API_TYPE: openai_compatible
       LLM_PROVIDER_BASE_URL: http://llm-provider:8000
