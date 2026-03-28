@@ -3,7 +3,7 @@ version: '3.8'
 services:
   prism:
     image: stoplight/prism:4
-    command: mock -h 0.0.0.0 /tmp/specs/comparison-service.yaml
+    command: mock -h 0.0.0.0 /tmp/specs/mimir-rag-api.yaml
     ports:
       - "8080:4010"
     volumes:
@@ -16,7 +16,7 @@ services:
     environment:
       URLS: |
         [
-          {"url": "/specs/comparison-service.yaml", "name": "Document Comparisons Service"}
+          {"url": "/specs/mimir-rag-api.yaml", "name": "Mimir RAG API"}
         ]
     volumes:
       - ./specs:/usr/share/nginx/html/specs:ro

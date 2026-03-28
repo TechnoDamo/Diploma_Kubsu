@@ -49,15 +49,33 @@ Result: DB is ready to serve after startup.
    1. `make migrate-up`
    2. `make migrate-status`
 
+## Schema highlights
+
+1. `documents.projects` stores public `description`, internal `context`, and project-level RAG runtime overrides.
+2. `documents.project_index_configs` stores versioned per-project indexing configuration.
+3. `documents.documents` snapshots the effective parsing/indexing configuration used for the document.
+4. `documents.document_chunks` stores ordered chunk text plus reconstruction offsets.
+5. `documents.document_processing_jobs` stores durable ingestion and reindex jobs.
+6. `analysis.analysis_jobs` and `analysis.analysis_job_targets` store contradiction-analysis execution and active references.
+
 ## Embedding dimensions configuration
 
-Dimensions are configured per model and enforced at DB level:
+Dimensions are configured per project index version and enforced at DB level:
 
-1. `embeddings.embedding_models.dimension` stores expected dimension.
-2. `00002_seed_embedding_models.sql` seeds initial models/dimensions.
-3. Trigger validation checks model dimension, row dimensionality, and `vector_dims(embedding)` consistency.
+1. `documents.project_index_configs.embedding_dimension` stores configured vector size.
+2. `documents.documents.embedding_dimension` snapshots the applied value for each document.
+3. `embeddings.embeddings.dimensionality` stores the row-level declared dimension.
+4. Trigger validation checks `vector_dims(embedding)` against row dimensionality.
 
-To change dimensions or allowed models, add a new migration that updates `embeddings.embedding_models`.
+Changing embedding model or dimension should create a new project index config version and trigger project reindexing.
+
+Selected RAG runtime defaults can be overridden per project:
+
+1. `documents.projects.query_rewrite_enabled`
+2. `documents.projects.retrieval_top_k`
+3. `documents.projects.context_top_n`
+
+If these are `NULL`, the backend falls back to environment-level defaults.
 
 ## Assets
 

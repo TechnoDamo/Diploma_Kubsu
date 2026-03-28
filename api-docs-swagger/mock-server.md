@@ -1,6 +1,6 @@
 # Mock Server
 
-Schema: `specs/comparison-service.yaml`
+Schema: `specs/mimir-rag-api.yaml`
 
 Start Prism mock server:
 

@@ -1,0 +1,1086 @@
+openapi: 3.1.0
+info:
+  title: Mimir RAG API
+  version: 1.2.0
+  summary: Strict MVP API for localhost-first RAG document system
+  description: |
+    OpenAPI contract for a localhost-first MVP of Mimir.
+
+    Design choices for this MVP:
+    - No authentication
+    - Project-scoped documents only
+    - Synchronous RAG query
+    - Asynchronous contradiction analysis
+    - Direct file streaming for document content
+    - Page/limit pagination
+    - Stable JSON envelopes for collections and errors
+    - No separate /view endpoint; frontend uses metadata + /content + /text
+    - If request scope omits target documents, the backend searches all indexed documents in the project
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development server
+
+tags:
+  - name: Projects
+  - name: Documents
+  - name: Content
+  - name: RAG
+  - name: Analysis
+
+paths:
+  /projects:
+    get:
+      tags: [Projects]
+      operationId: listProjects
+      summary: List projects
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Projects list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Projects]
+      operationId: createProject
+      summary: Create project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /projects/{projectId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Projects]
+      operationId: getProject
+      summary: Get project
+      responses:
+        '200':
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '404':
+          $ref: '#/components/responses/ProjectNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Projects]
+      operationId: deleteProject
+      summary: Delete project
+      responses:
+        '204':
+          description: Project deleted
+        '404':
+          $ref: '#/components/responses/ProjectNotFound'
+        '409':
+          $ref: '#/components/responses/ProjectBusy'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /projects/{projectId}/documents:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Documents]
+      operationId: listDocuments
+      summary: List documents in project
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Documents list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentListResponse'
+        '404':
+          $ref: '#/components/responses/ProjectNotFound'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Documents]
+      operationId: uploadDocument
+      summary: Upload document to project
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadDocumentRequest'
+            encoding:
+              file:
+                contentType: application/pdf, text/plain, text/markdown, application/vnd.openxmlformats-officedocument.wordprocessingml.document
+      responses:
+        '201':
+          description: Document uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/ProjectNotFound'
+        '409':
+          $ref: '#/components/responses/ProjectReindexing'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /projects/{projectId}/documents/{documentId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags: [Documents]
+      operationId: getDocument
+      summary: Get document metadata
+      responses:
+        '200':
+          description: Document metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '404':
+          $ref: '#/components/responses/DocumentNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Documents]
+      operationId: deleteDocument
+      summary: Delete document
+      responses:
+        '204':
+          description: Document deleted
+        '404':
+          $ref: '#/components/responses/DocumentNotFound'
+        '409':
+          $ref: '#/components/responses/DocumentBusy'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /projects/{projectId}/documents/{documentId}/content:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags: [Content]
+      operationId: getDocumentContent
+      summary: Download or render original file
+      responses:
+        '200':
+          description: Raw document bytes
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            text/plain:
+              schema:
+                type: string
+            text/markdown:
+              schema:
+                type: string
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/DocumentNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /projects/{projectId}/documents/{documentId}/text:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags: [Content]
+      operationId: getDocumentText
+      summary: Get extracted text
+      responses:
+        '200':
+          description: Extracted document text
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentTextResponse'
+        '404':
+          $ref: '#/components/responses/DocumentNotFound'
+        '409':
+          description: Text is not available yet because processing is incomplete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                processing_not_finished:
+                  value:
+                    error:
+                      code: DOCUMENT_NOT_READY
+                      message: Document text is not available yet because processing is not finished.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /projects/{projectId}/rag/query:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      tags: [RAG]
+      operationId: queryRag
+      summary: Ask question against project documents
+      description: |
+        Runs a synchronous RAG query within one project.
+
+        If `target_document_ids` is omitted, the backend searches across all indexed
+        documents in the project. If explicit target documents are provided and some
+        of them are not indexed yet, those documents are ignored and the response may
+        include a warning message. Unknown target document IDs are ignored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RagQueryRequest'
+      responses:
+        '200':
+          description: RAG answer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RagQueryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/ProjectNotFound'
+        '409':
+          $ref: '#/components/responses/ProjectReindexing'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /projects/{projectId}/analysis/contradictions:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      tags: [Analysis]
+      operationId: startContradictionAnalysis
+      summary: Start contradiction analysis job
+      description: |
+        Starts an asynchronous contradiction analysis job.
+
+        The base document must already be indexed.
+
+        If `target_document_ids` is omitted, the backend compares the base document
+        against all other indexed documents in the project. If explicit target
+        documents are provided and some of them are not indexed yet, those documents
+        are ignored and the job response may include a warning message. Unknown
+        target document IDs are ignored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartContradictionAnalysisRequest'
+      responses:
+        '202':
+          description: Analysis job accepted
+          headers:
+            Location:
+              description: Absolute or relative URL of the job status resource.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisJobAcceptedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/ProjectNotFound'
+        '409':
+          $ref: '#/components/responses/AnalysisStartConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /projects/{projectId}/analysis/contradictions/{jobId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [Analysis]
+      operationId: getContradictionAnalysis
+      summary: Get contradiction analysis job state and result
+      responses:
+        '200':
+          description: Analysis job details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContradictionAnalysisResponse'
+        '404':
+          $ref: '#/components/responses/AnalysisJobNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ProjectId'
+    DocumentId:
+      name: documentId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/DocumentId'
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/JobId'
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    BadRequest:
+      description: Request is malformed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            bad_request:
+              value:
+                error:
+                  code: BAD_REQUEST
+                  message: Request is malformed.
+    Conflict:
+      description: Resource conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            project_name_conflict:
+              value:
+                error:
+                  code: PROJECT_ALREADY_EXISTS
+                  message: Project with the same name already exists.
+    ValidationError:
+      description: Request failed business validation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
+    PayloadTooLarge:
+      description: Uploaded file is too large
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            payload_too_large:
+              value:
+                error:
+                  code: FILE_TOO_LARGE
+                  message: Uploaded file exceeds the maximum allowed size.
+    UnsupportedMediaType:
+      description: Uploaded file type is not supported
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            unsupported_media_type:
+              value:
+                error:
+                  code: UNSUPPORTED_MEDIA_TYPE
+                  message: Uploaded file type is not supported.
+    ProjectNotFound:
+      description: Project was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            project_not_found:
+              value:
+                error:
+                  code: PROJECT_NOT_FOUND
+                  message: Project does not exist.
+    ProjectBusy:
+      description: Project cannot be deleted because active jobs or reindex work still reference it
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            project_has_active_jobs:
+              value:
+                error:
+                  code: PROJECT_HAS_ACTIVE_JOBS
+                  message: Project cannot be deleted while active jobs are running.
+    ProjectReindexing:
+      description: Project is temporarily unavailable because reindexing is in progress
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            project_reindexing:
+              value:
+                error:
+                  code: PROJECT_REINDEXING
+                  message: Project is temporarily unavailable because reindexing is in progress.
+    DocumentNotFound:
+      description: Document was not found in the specified project
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            document_not_found:
+              value:
+                error:
+                  code: DOCUMENT_NOT_FOUND
+                  message: Document does not exist in this project.
+    DocumentBusy:
+      description: Document cannot be deleted because active jobs still reference it or the project is reindexing
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            document_has_active_jobs:
+              value:
+                error:
+                  code: DOCUMENT_HAS_ACTIVE_JOBS
+                  message: Document cannot be deleted while active jobs are running.
+            project_reindexing:
+              value:
+                error:
+                  code: PROJECT_REINDEXING
+                  message: Project is temporarily unavailable because reindexing is in progress.
+    AnalysisJobNotFound:
+      description: Analysis job was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            analysis_job_not_found:
+              value:
+                error:
+                  code: ANALYSIS_JOB_NOT_FOUND
+                  message: Analysis job does not exist in this project.
+    AnalysisStartConflict:
+      description: Contradiction analysis could not be started because the project or base document is not ready
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            base_document_not_ready:
+              value:
+                error:
+                  code: DOCUMENT_NOT_READY
+                  message: Base document is not indexed yet and cannot be used for contradiction analysis.
+            project_reindexing:
+              value:
+                error:
+                  code: PROJECT_REINDEXING
+                  message: Project is temporarily unavailable because reindexing is in progress.
+    InternalServerError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            internal_server_error:
+              value:
+                error:
+                  code: INTERNAL_SERVER_ERROR
+                  message: Unexpected internal server error.
+
+  schemas:
+    ProjectId:
+      type: integer
+      minimum: 1
+      example: 123
+
+    DocumentId:
+      type: integer
+      minimum: 1
+      example: 456
+
+    JobId:
+      type: integer
+      minimum: 1
+      example: 999
+
+    Timestamp:
+      type: string
+      format: date-time
+      example: '2026-03-15T18:15:00Z'
+
+    Project:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - document_count
+        - created_at
+      properties:
+        id:
+          $ref: '#/components/schemas/ProjectId'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: Legal Contracts
+        description:
+          type: string
+          minLength: 0
+          maxLength: 2000
+          example: Contracts for review
+        document_count:
+          type: integer
+          minimum: 0
+          example: 4
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    CreateProjectRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: Legal Contracts
+        description:
+          type: string
+          minLength: 0
+          maxLength: 2000
+          example: Contracts for review
+
+    ProjectListResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - total
+        - page
+        - limit
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Project'
+        total:
+          type: integer
+          minimum: 0
+          example: 1
+        page:
+          type: integer
+          minimum: 1
+          example: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 20
+
+    DocumentStatus:
+      type: string
+      description: |
+        Public document lifecycle exposed over HTTP.
+
+        `indexed` means the document is fully processed and eligible for RAG and
+        contradiction-analysis search.
+      enum:
+        - uploaded
+        - processing
+        - indexed
+        - failed
+      example: indexed
+
+    Document:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - project_id
+        - name
+        - size_bytes
+        - mime_type
+        - status
+        - created_at
+      properties:
+        id:
+          $ref: '#/components/schemas/DocumentId'
+        project_id:
+          $ref: '#/components/schemas/ProjectId'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: contract.pdf
+        size_bytes:
+          type: integer
+          minimum: 0
+          example: 1048576
+        mime_type:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: application/pdf
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    DocumentListResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - total
+        - page
+        - limit
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+        total:
+          type: integer
+          minimum: 0
+          example: 1
+        page:
+          type: integer
+          minimum: 1
+          example: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 20
+
+    UploadDocumentRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - file
+      properties:
+        file:
+          type: string
+          format: binary
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+
+    DocumentTextResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - document_id
+        - text
+      properties:
+        document_id:
+          $ref: '#/components/schemas/DocumentId'
+        text:
+          type: string
+          example: Full extracted text of the document...
+
+    RagQueryRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - question
+      properties:
+        question:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          example: What are the termination conditions?
+        target_document_ids:
+          description: |
+            Optional explicit document scope.
+
+            If omitted, all indexed documents in the project are searched. If this
+            list includes documents that are not indexed yet, those documents are
+            ignored. Unknown target document IDs are ignored.
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/DocumentId'
+
+    Citation:
+      type: object
+      additionalProperties: false
+      required:
+        - document_id
+        - document_name
+        - snippet
+      properties:
+        document_id:
+          $ref: '#/components/schemas/DocumentId'
+        document_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: contract.pdf
+        snippet:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          example: Either party may terminate this agreement with 30 days written notice...
+
+    RagQueryResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - answer
+        - citations
+      properties:
+        answer:
+          type: string
+          minLength: 1
+          example: The agreement may be terminated with 30 days written notice.
+        warning_message:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          example: Some requested target documents were ignored because they are not indexed yet.
+        citations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Citation'
+
+    AcceptedAnalysisJobStatus:
+      type: string
+      enum:
+        - queued
+        - processing
+      example: queued
+
+    AnalysisJobStatus:
+      type: string
+      enum:
+        - queued
+        - processing
+        - completed
+        - failed
+      example: queued
+
+    AnalysisJobAcceptedResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - job_id
+        - status
+        - poll_url
+      properties:
+        job_id:
+          $ref: '#/components/schemas/JobId'
+        status:
+          $ref: '#/components/schemas/AcceptedAnalysisJobStatus'
+        poll_url:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          example: /api/v1/projects/123/analysis/contradictions/999
+        warning_message:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          example: Some requested target documents were ignored because they are not indexed yet.
+
+    Contradiction:
+      type: object
+      additionalProperties: false
+      required:
+        - base_text
+        - target_text
+        - confidence
+        - explanation
+        - base_chunk_order
+        - target_chunk_order
+      properties:
+        base_text:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          example: Payment due in 60 days
+        target_text:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          example: Payment due in 30 days
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          example: 0.84
+        explanation:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          example: Both chunks describe payment timing, but one says 60 days and the other says 30 days.
+        base_chunk_order:
+          type: integer
+          minimum: 0
+          example: 4
+        target_chunk_order:
+          type: integer
+          minimum: 0
+          example: 2
+
+    ContradictionResult:
+      type: object
+      additionalProperties: false
+      required:
+        - target_document_id
+        - target_document_name
+        - summary
+        - contradictions
+      properties:
+        target_document_id:
+          $ref: '#/components/schemas/DocumentId'
+        target_document_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: supplier-terms.pdf
+        summary:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          example: The target document conflicts with the base document on payment timing and notice periods.
+        contradictions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Contradiction'
+
+    StartContradictionAnalysisRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - base_document_id
+      properties:
+        base_document_id:
+          $ref: '#/components/schemas/DocumentId'
+        target_document_ids:
+          description: |
+            Optional explicit comparison scope.
+
+            If omitted, the backend compares the base document against all other
+            indexed documents in the project. If this list includes documents that
+            are not indexed yet, those documents are ignored. Unknown target
+            document IDs are ignored.
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/DocumentId'
+
+    ContradictionAnalysisPendingResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - job_id
+        - status
+      properties:
+        job_id:
+          $ref: '#/components/schemas/JobId'
+        status:
+          $ref: '#/components/schemas/AcceptedAnalysisJobStatus'
+        warning_message:
+          type: string
+          minLength: 1
+          maxLength: 4000
+
+    CompletedContradictionAnalysisResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - job_id
+        - status
+        - results
+      properties:
+        job_id:
+          $ref: '#/components/schemas/JobId'
+        status:
+          type: string
+          const: completed
+        warning_message:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        results:
+          description: Ranked contradiction results by target document.
+          type: array
+          items:
+            $ref: '#/components/schemas/ContradictionResult'
+
+    FailedContradictionAnalysisResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - job_id
+        - status
+        - error_message
+      properties:
+        job_id:
+          $ref: '#/components/schemas/JobId'
+        status:
+          type: string
+          const: failed
+        warning_message:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        error_message:
+          description: Human-readable explanation of why the analysis job failed.
+          type: string
+          minLength: 1
+          maxLength: 4000
+
+    ContradictionAnalysisResponse:
+      oneOf:
+        - $ref: '#/components/schemas/ContradictionAnalysisPendingResponse'
+        - $ref: '#/components/schemas/CompletedContradictionAnalysisResponse'
+        - $ref: '#/components/schemas/FailedContradictionAnalysisResponse'
+
+    ErrorDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 128
+          example: DOCUMENT_NOT_FOUND
+        message:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          example: Document does not exist in this project.
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+
+    ValidationIssue:
+      type: object
+      additionalProperties: false
+      required:
+        - field
+        - message
+      properties:
+        field:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: name
+        message:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          example: must not be empty
+
+    ValidationErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+        - issues
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+        issues:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ValidationIssue'

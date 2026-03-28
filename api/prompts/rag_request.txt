@@ -1,0 +1,5 @@
+Rewrite the user's question into a concise, search-oriented retrieval query for semantic document lookup.
+Preserve the original meaning, constraints, entities, and requested outcome.
+Do not answer the question.
+Do not add explanations or formatting.
+Return only the rewritten retrieval query text.

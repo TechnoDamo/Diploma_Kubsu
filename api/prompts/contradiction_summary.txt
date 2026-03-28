@@ -1,0 +1,5 @@
+Write a concise document-level contradiction summary based only on the detected contradiction findings.
+Explain the main areas of conflict between the base document and the target document.
+Focus on substance, not wording.
+Do not invent contradictions that are not present in the findings.
+Return plain text only.

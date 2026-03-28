@@ -38,28 +38,51 @@ This document defines how the `knowledge_db` database is designed, migrated, sta
 
 ## Schemas
 
-1. `documents`: projects, documents, chunks, lifecycle/history dictionaries.
+1. `documents`: projects, project index configs, documents, chunks, processing jobs, lifecycle/history dictionaries.
 2. `embeddings`: embedding models and vectors.
-3. `system`: request type dictionary and request history.
+3. `analysis`: contradiction-analysis jobs and relational target references.
+4. `system`: request type dictionary and request history.
 
 ## Core relation chain
 
-1. `documents.projects` -> `documents.documents`
-2. `documents.documents` -> `documents.document_chunks`
-3. `documents.document_chunks` -> `embeddings.embeddings`
-4. `embeddings.embedding_models` -> `embeddings.embeddings`
+1. `documents.projects` -> `documents.project_index_configs`
+2. `documents.project_index_configs` -> `documents.documents`
+3. `documents.documents` -> `documents.document_chunks`
+4. `documents.document_chunks` -> `embeddings.embeddings`
+5. `analysis.analysis_jobs` -> `analysis.analysis_job_targets`
 
 ## Embedding dimensions configuration
 
-Dimensions are configured per model and enforced in DB:
+Dimensions are configured per project index version and enforced in DB:
 
-1. `embeddings.embedding_models.dimension` defines expected vector size.
-2. `embeddings.embeddings.dimensionality` stores row-level declared dimension.
-3. Trigger `embeddings.validate_embedding_dimensions()` enforces:
-   1. model dimension equals row dimensionality
-   2. row dimensionality equals `vector_dims(embedding)`
+1. `documents.project_index_configs.embedding_dimension` defines the intended vector size for that project config version.
+2. `documents.documents.embedding_dimension` snapshots the applied value for each document.
+3. `embeddings.embeddings.dimensionality` stores row-level declared dimension.
+4. Trigger `embeddings.validate_embedding_dimensions()` enforces row dimensionality equals `vector_dims(embedding)`.
 
-Default model configuration is seeded by `00002_seed_embedding_models.sql`.
+Selected RAG runtime defaults are stored on `documents.projects` rather than inside `documents.project_index_configs`:
+
+1. `query_rewrite_enabled`
+2. `retrieval_top_k`
+3. `context_top_n`
+
+This keeps project retrieval behavior configurable without mixing runtime RAG knobs into index-version history.
+
+Default dictionary rows are seeded by `00002_seed_embedding_models.sql`.
+
+## Chunk reconstruction model
+
+Document text is reconstructed from ordered chunks:
+
+1. `documents.document_chunks.chunk_order_id` defines stable order.
+2. `documents.document_chunks.char_start` and `char_end` preserve deterministic reconstruction boundaries.
+3. `documents.documents` stores chunking metadata such as strategy, size, overlap, unit, and tokenizer.
+
+## Async persistence model
+
+1. `documents.document_processing_jobs` stores durable ingestion and reindex work.
+2. `analysis.analysis_jobs` stores durable contradiction-analysis work and result payloads as `jsonb`.
+3. `analysis.analysis_job_targets` keeps active target references relational so delete checks remain simple.
 
 ## Day-to-day usage
 

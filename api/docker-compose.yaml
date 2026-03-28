@@ -1,0 +1,155 @@
+services:
+  postgres-vector:
+    image: pgvector/pgvector:pg15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: knowledge_base
+      POSTGRES_USER: knowledge_base_admin
+      POSTGRES_PASSWORD: pass123!
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --lc-collate=C --lc-ctype=C
+      TZ: UTC
+    ports:
+      - "5432:5432"
+    volumes:
+      - mimir_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U knowledge_base_admin -d knowledge_base"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  migrator:
+    build:
+      context: ../knowledge_db
+      dockerfile: Dockerfile.migrator
+    restart: "no"
+    depends_on:
+      postgres-vector:
+        condition: service_healthy
+    volumes:
+      - ../knowledge_db:/workspace:ro
+    working_dir: /workspace
+    command:
+      - -dir
+      - /workspace/migrations
+      - postgres
+      - host=postgres-vector port=5432 user=knowledge_base_admin password=pass123! dbname=knowledge_base sslmode=disable
+      - up
+
+  api:
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    depends_on:
+      postgres-vector:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+    environment:
+      APP_ENV: container
+      LOG_LEVEL: INFO
+      ENABLE_LOCAL_FALLBACKS: "true"
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: 8080
+      HTTP_PUBLIC_BASE_URL: http://localhost:8080
+      HTTP_READ_TIMEOUT: 15s
+      HTTP_WRITE_TIMEOUT: 15s
+      HTTP_IDLE_TIMEOUT: 60s
+      HTTP_MAX_UPLOAD_SIZE_BYTES: 26214400
+      POSTGRES_DSN: postgres://knowledge_base_admin:pass123!@postgres-vector:5432/knowledge_base?sslmode=disable
+      POSTGRES_MAX_CONNS: 10
+      POSTGRES_MIN_CONNS: 2
+      WORKER_POLL_INTERVAL: 3s
+      WORKER_BATCH_SIZE: 10
+      FILES_ROOT_DIR: /app/var/files
+      PROMPTS_DIR: /app/prompts
+      DOCLING_BASE_URL: http://docling:5001
+      TEI_BASE_URL: http://tei:8080
+      LLM_PROVIDER: deepseek
+      LLM_API_TYPE: openai_compatible
+      LLM_PROVIDER_BASE_URL: http://llm-provider:8000
+      LLM_PROVIDER_API_KEY: ""
+      LLM_MODEL_NAME: deepseek-chat
+      PROJECT_INDEX_DEFAULTS_INGESTION_PIPELINE_ID: 1
+      PROJECT_INDEX_DEFAULTS_EMBEDDING_PIPELINE_ID: 1
+      PROJECT_INDEX_DEFAULTS_EMBEDDING_MODEL_NAME: Qwen3-Embedding-0.6B
+      PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION: 1024
+      PROJECT_INDEX_DEFAULTS_PARSER_NAME: docling
+      PROJECT_INDEX_DEFAULTS_PARSER_VERSION: ""
+      PROJECT_INDEX_DEFAULTS_CHUNKING_STRATEGY: recursive
+      PROJECT_INDEX_DEFAULTS_CHUNK_SIZE: 1200
+      PROJECT_INDEX_DEFAULTS_CHUNK_OVERLAP: 200
+      PROJECT_INDEX_DEFAULTS_CHUNK_UNIT: characters
+      PROJECT_INDEX_DEFAULTS_TOKENIZER_NAME: ""
+      QUERY_REWRITE_DEFAULT_ENABLED: "true"
+      RAG_RETRIEVAL_TOP_K: 8
+      RAG_CONTEXT_TOP_N: 4
+      CONTRADICTION_MAX_DISTANCE: 0.35
+      CONTRADICTION_TOP_K_PER_BASE_CHUNK: 1
+      CONTRADICTION_MAX_PAIRS_PER_JOB: 50
+    ports:
+      - "8080:8080"
+    volumes:
+      - mimir_files:/app/var/files
+
+  worker:
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    depends_on:
+      postgres-vector:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+    command: ["/app/mimir-worker"]
+    environment:
+      APP_ENV: container
+      LOG_LEVEL: INFO
+      ENABLE_LOCAL_FALLBACKS: "true"
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: 8080
+      HTTP_PUBLIC_BASE_URL: http://localhost:8080
+      HTTP_READ_TIMEOUT: 15s
+      HTTP_WRITE_TIMEOUT: 15s
+      HTTP_IDLE_TIMEOUT: 60s
+      HTTP_MAX_UPLOAD_SIZE_BYTES: 26214400
+      POSTGRES_DSN: postgres://knowledge_base_admin:pass123!@postgres-vector:5432/knowledge_base?sslmode=disable
+      POSTGRES_MAX_CONNS: 10
+      POSTGRES_MIN_CONNS: 2
+      WORKER_POLL_INTERVAL: 3s
+      WORKER_BATCH_SIZE: 10
+      FILES_ROOT_DIR: /app/var/files
+      PROMPTS_DIR: /app/prompts
+      DOCLING_BASE_URL: http://docling:5001
+      TEI_BASE_URL: http://tei:8080
+      LLM_PROVIDER: deepseek
+      LLM_API_TYPE: openai_compatible
+      LLM_PROVIDER_BASE_URL: http://llm-provider:8000
+      LLM_PROVIDER_API_KEY: ""
+      LLM_MODEL_NAME: deepseek-chat
+      PROJECT_INDEX_DEFAULTS_INGESTION_PIPELINE_ID: 1
+      PROJECT_INDEX_DEFAULTS_EMBEDDING_PIPELINE_ID: 1
+      PROJECT_INDEX_DEFAULTS_EMBEDDING_MODEL_NAME: Qwen3-Embedding-0.6B
+      PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION: 1024
+      PROJECT_INDEX_DEFAULTS_PARSER_NAME: docling
+      PROJECT_INDEX_DEFAULTS_PARSER_VERSION: ""
+      PROJECT_INDEX_DEFAULTS_CHUNKING_STRATEGY: recursive
+      PROJECT_INDEX_DEFAULTS_CHUNK_SIZE: 1200
+      PROJECT_INDEX_DEFAULTS_CHUNK_OVERLAP: 200
+      PROJECT_INDEX_DEFAULTS_CHUNK_UNIT: characters
+      PROJECT_INDEX_DEFAULTS_TOKENIZER_NAME: ""
+      QUERY_REWRITE_DEFAULT_ENABLED: "true"
+      RAG_RETRIEVAL_TOP_K: 8
+      RAG_CONTEXT_TOP_N: 4
+      CONTRADICTION_MAX_DISTANCE: 0.35
+      CONTRADICTION_TOP_K_PER_BASE_CHUNK: 1
+      CONTRADICTION_MAX_PAIRS_PER_JOB: 50
+    volumes:
+      - mimir_files:/app/var/files
+
+volumes:
+  mimir_postgres_data:
+  mimir_files:

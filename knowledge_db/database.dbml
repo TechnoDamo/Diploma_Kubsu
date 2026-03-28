@@ -1,9 +1,8 @@
 Table "embeddings"."embedding_models" {
   "id" bigint [pk, not null, increment]
   "name" varchar(100) [not null]
+  "parameter_count" bigint [not null]
   "description" text
-  "dimension" int [not null]
-  "is_active" boolean [not null, default: true]
 
   Indexes {
     name [unique, name: "idx_embedding_models_name"]
@@ -12,26 +11,62 @@ Table "embeddings"."embedding_models" {
 
 Table "embeddings"."embeddings" {
   "id" bigint [pk, not null, increment]
-  "chunk_id" bigint [not null, ref: < "documents"."document_chunks"."id"]
-  "model_id" bigint [not null, ref: < "embeddings"."embedding_models"."id"]
+  "chunk_id" bigint [not null]
+  "model_id" bigint [not null, ref: > "embeddings"."embedding_models"."id"]
   "version" int [not null]
   "embedding" vector [not null]
   "dimensionality" int [not null]
   "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
 
   Indexes {
-    (chunk_id, model_id, version) [unique, name: "idx_embeddings_chunk_id_model_id_version"]
     chunk_id [name: "idx_embeddings_chunk_id"]
     model_id [name: "idx_embeddings_model_id"]
+    (chunk_id, model_id, version) [unique, name: "idx_embeddings_chunk_id_model_id_version"]
+  }
+}
+
+Table "analysis"."analysis_jobs" {
+  "id" bigint [pk, not null, increment]
+  "project_id" bigint [not null, ref: > "documents"."projects"."id"]
+  "base_document_id" bigint [not null, ref: > "documents"."documents"."id"]
+  "project_index_config_id" bigint [not null, ref: > "documents"."project_index_configs"."id"]
+  "status" varchar(32) [not null]
+  "requested_target_document_ids" jsonb [not null]
+  "warning_message" text
+  "result_payload" jsonb
+  "error_message" text
+  "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  "started_at" timestamptz
+  "completed_at" timestamptz
+
+  Indexes {
+    project_id [name: "idx_analysis_jobs_project_id"]
+    status [name: "idx_analysis_jobs_status"]
+    base_document_id [name: "idx_analysis_jobs_base_document_id"]
+  }
+}
+
+Table "analysis"."analysis_job_targets" {
+  "analysis_job_id" bigint [not null, ref: > "analysis"."analysis_jobs"."id"]
+  "document_id" bigint [not null, ref: > "documents"."documents"."id"]
+  "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  Indexes {
+    (analysis_job_id, document_id) [pk, name: "pk_analysis_job_targets"]
+    document_id [name: "idx_analysis_job_targets_document_id"]
   }
 }
 
 Table "documents"."documents" {
   "id" bigint [pk, not null, increment]
-  "project_id" bigint [not null, ref: < "documents"."projects"."id"]
-  "document_status_id" bigint [not null, ref: < "documents"."document_statuses"."id"]
-  "ingestion_pipeline_id" bigint [not null, ref: < "documents"."ingestion_pipelines"."id"]
-  "embedding_pipeline_id" bigint [not null, ref: < "documents"."embedding_pipelines"."id"]
+  "project_id" bigint [not null, ref: > "documents"."projects"."id"]
+  "project_index_config_id" bigint [not null, ref: > "documents"."project_index_configs"."id"]
+  "document_status_id" bigint [not null, ref: > "documents"."document_statuses"."id"]
+  "ingestion_pipeline_id" bigint [not null, ref: > "documents"."ingestion_pipelines"."id"]
+  "embedding_pipeline_id" bigint [not null, ref: > "documents"."embedding_pipelines"."id"]
+  "embedding_model_id" bigint [not null, ref: > "embeddings"."embedding_models"."id"]
+  "embedding_dimension" int [not null]
+  "index_version" int [not null]
   "name" varchar(500) [not null]
   "description" text
   "file_address" varchar(1000) [not null]
@@ -39,45 +74,109 @@ Table "documents"."documents" {
   "mime_type" varchar(255) [not null]
   "checksum" varchar(128) [not null]
   "language" varchar(32)
+  "parser_name" varchar(100) [not null]
+  "parser_version" varchar(100)
+  "chunking_strategy" varchar(100) [not null]
+  "chunk_size" int [not null]
+  "chunk_overlap" int [not null]
+  "chunk_unit" varchar(32) [not null]
+  "tokenizer_name" varchar(100)
   "total_chunks" int [not null, default: 0]
   "total_token_count" int [not null, default: 0]
   "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
   "updated_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
 
   Indexes {
-    file_address [unique, name: "idx_documents_file_address"]
     checksum [name: "idx_documents_checksum"]
     project_id [name: "idx_documents_project_id"]
+    project_index_config_id [name: "idx_documents_project_index_config_id"]
+    file_address [unique, name: "idx_documents_file_address"]
   }
 }
 
 Table "documents"."projects" {
   "id" bigint [pk, not null, increment]
   "name" varchar(500) [not null]
+  "description" text
   "context" text [not null]
+  "query_rewrite_enabled" boolean
+  "retrieval_top_k" int
+  "context_top_n" int
   "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
   "updated_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  Indexes {
+    name [unique, name: "idx_projects_name"]
+  }
+}
+
+Table "documents"."project_index_configs" {
+  "id" bigint [pk, not null, increment]
+  "project_id" bigint [not null, ref: > "documents"."projects"."id"]
+  "ingestion_pipeline_id" bigint [not null, ref: > "documents"."ingestion_pipelines"."id"]
+  "embedding_pipeline_id" bigint [not null, ref: > "documents"."embedding_pipelines"."id"]
+  "embedding_model_id" bigint [not null, ref: > "embeddings"."embedding_models"."id"]
+  "embedding_dimension" int [not null]
+  "parser_name" varchar(100) [not null]
+  "parser_version" varchar(100)
+  "chunking_strategy" varchar(100) [not null]
+  "chunk_size" int [not null]
+  "chunk_overlap" int [not null]
+  "chunk_unit" varchar(32) [not null]
+  "tokenizer_name" varchar(100)
+  "status" varchar(32) [not null]
+  "version" int [not null]
+  "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  "updated_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  Indexes {
+    project_id [name: "idx_project_index_configs_project_id"]
+    status [name: "idx_project_index_configs_status"]
+    (project_id, version) [unique, name: "idx_project_index_configs_project_id_version"]
+  }
 }
 
 Table "documents"."document_chunks" {
-  "id" bigint [pk, not null, increment]
-  "document_id" bigint [not null, ref: < "documents"."documents"."id"]
+  "id" bigint [pk, not null, increment, ref: - "embeddings"."embeddings"."chunk_id"]
+  "document_id" bigint [not null, ref: > "documents"."documents"."id"]
   "chunk_order_id" int [not null]
   "chunk_text" text [not null]
+  "char_start" int [not null]
+  "char_end" int [not null]
   "char_count" int [not null]
   "token_count" int [not null]
   "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
 
   Indexes {
-    (document_id, chunk_order_id) [unique, name: "idx_document_chunks_document_id_chunk_order"]
     document_id [name: "idx_document_chunks_document_id"]
+    (document_id, chunk_order_id) [unique, name: "idx_document_chunks_document_id_chunk_order"]
+  }
+}
+
+Table "documents"."document_processing_jobs" {
+  "id" bigint [pk, not null, increment]
+  "project_id" bigint [not null, ref: > "documents"."projects"."id"]
+  "document_id" bigint [not null, ref: > "documents"."documents"."id"]
+  "project_index_config_id" bigint [not null, ref: > "documents"."project_index_configs"."id"]
+  "job_type" varchar(32) [not null]
+  "status" varchar(32) [not null]
+  "attempt_count" int [not null, default: 0]
+  "error_message" text
+  "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  "started_at" timestamptz
+  "completed_at" timestamptz
+
+  Indexes {
+    project_id [name: "idx_document_processing_jobs_project_id"]
+    document_id [name: "idx_document_processing_jobs_document_id"]
+    status [name: "idx_document_processing_jobs_status"]
   }
 }
 
 Table "documents"."document_history" {
   "id" bigint [pk, not null, increment]
-  "document_id" bigint [not null, ref: < "documents"."documents"."id"]
-  "operation_type_id" bigint [not null, ref: < "documents"."document_operation_types"."id"]
+  "document_id" bigint [not null, ref: > "documents"."documents"."id"]
+  "operation_type_id" bigint [not null, ref: > "documents"."document_operation_types"."id"]
   "comment" text [not null]
   "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
 
@@ -96,14 +195,10 @@ Table "documents"."document_operation_types" {
   }
 }
 
-Table "documents"."document_statuses" {
-  "id" bigint [pk, not null, increment]
-  "name" varchar(100) [not null]
+Table "documents"."embedding_pipelines" {
+  "id" bigint [pk, not null]
+  "name" varchar(500) [not null]
   "description" text [not null]
-
-  Indexes {
-    name [unique, name: "idx_document_statuses_name"]
-  }
 }
 
 Table "documents"."ingestion_pipelines" {
@@ -112,10 +207,14 @@ Table "documents"."ingestion_pipelines" {
   "description" text [not null]
 }
 
-Table "documents"."embedding_pipelines" {
-  "id" bigint [pk, not null]
-  "name" varchar(500) [not null]
+Table "documents"."document_statuses" {
+  "id" bigint [pk, not null, increment]
+  "name" varchar(100) [not null]
   "description" text [not null]
+
+  Indexes {
+    name [unique, name: "idx_document_statuses_name"]
+  }
 }
 
 Table "system"."request_types" {
@@ -130,13 +229,13 @@ Table "system"."request_types" {
 
 Table "system"."request_history" {
   "id" bigint [pk, not null, increment]
-  "type_id" bigint [not null, ref: < "system"."request_types"."id"]
+  "type_id" bigint [not null, ref: > "system"."request_types"."id"]
   "request_data" jsonb [not null]
   "user_ip" inet [not null]
   "created_at" timestamptz [not null, default: `CURRENT_TIMESTAMP`]
 
   Indexes {
-    type_id [name: "idx_request_history_type_id"]
     created_at [name: "idx_request_history_created_at"]
+    type_id [name: "idx_request_history_type_id"]
   }
 }

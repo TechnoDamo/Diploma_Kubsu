@@ -1,0 +1,5 @@
+Decide whether the two supplied statements materially contradict each other in the context of the project.
+Return strict JSON with keys: is_contradiction, confidence, explanation.
+Confidence must be a number between 0 and 1.
+Mark contradictions only when the conflict is real and substantive, not merely different wording.
+Be conservative when the candidate statements are only weakly related.
