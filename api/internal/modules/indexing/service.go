@@ -299,11 +299,26 @@ func (s service) embedTexts(ctx context.Context, texts []string, dimensions int)
 		return [][]float32{}, nil
 	}
 
-	embeddings, err := s.tei.Embed(ctx, texts, dimensions)
-	if err == nil {
-		return embeddings, nil
+	batchSize := s.cfg.TEIEmbedBatchSize
+	if batchSize <= 0 {
+		batchSize = 64
 	}
-	return nil, fmt.Errorf("embed document chunks with tei: %w", err)
+
+	embeddings := make([][]float32, 0, len(texts))
+	for start := 0; start < len(texts); start += batchSize {
+		end := start + batchSize
+		if end > len(texts) {
+			end = len(texts)
+		}
+
+		batchEmbeddings, err := s.tei.Embed(ctx, texts[start:end], dimensions)
+		if err != nil {
+			return nil, fmt.Errorf("embed document chunks with tei batch %d-%d: %w", start, end, err)
+		}
+		embeddings = append(embeddings, batchEmbeddings...)
+	}
+
+	return embeddings, nil
 }
 
 func guessLanguage(text string) *string {

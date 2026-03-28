@@ -38,6 +38,7 @@ type Config struct {
 	ContradictionMaxDistance      float64 `env:"CONTRADICTION_MAX_DISTANCE" env-default:"0.35"`
 	ContradictionTopKPerBaseChunk int     `env:"CONTRADICTION_TOP_K_PER_BASE_CHUNK" env-default:"1"`
 	ContradictionMaxPairsPerJob   int     `env:"CONTRADICTION_MAX_PAIRS_PER_JOB" env-default:"50"`
+	TEIEmbedBatchSize             int     `env:"TEI_EMBED_BATCH_SIZE" env-default:"64"`
 }
 
 type HTTPConfig struct {

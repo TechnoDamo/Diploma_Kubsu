@@ -14,6 +14,14 @@ source .env
 set +a
 ```
 
+For the standard local Go runtime, you can use:
+
+```bash
+./scripts/start_local.sh
+```
+
+That script loads `.env`, exports the variables, uses workspace-local Go cache directories, starts both backend processes, and writes logs to `api/var/log/`.
+
 ## Core Runtime
 
 - `APP_ENV`
@@ -80,6 +88,8 @@ This directory must be persistent in any deployment where document content must 
   Base URL for the document parsing service.
 - `TEI_BASE_URL`
   Base URL for the text-embeddings-inference service.
+- `TEI_EMBED_BATCH_SIZE`
+  Number of chunk texts sent in a single TEI embedding request during indexing.
 - `LLM_PROVIDER`
   Logical provider label used for logs and future routing decisions.
 - `LLM_API_TYPE`
@@ -143,3 +153,5 @@ These should match seeded dictionary rows and the TEI model actually serving emb
 2. `PROJECT_INDEX_DEFAULTS_INGESTION_PIPELINE_ID` must exist in `documents.ingestion_pipelines`.
 3. `PROJECT_INDEX_DEFAULTS_EMBEDDING_PIPELINE_ID` must exist in `documents.embedding_pipelines`.
 4. `PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION` must match the vector size produced by the active TEI model.
+
+The backend validates these rules at startup when dependency checks are enabled, so invalid local configuration fails fast instead of breaking later during project creation or indexing.

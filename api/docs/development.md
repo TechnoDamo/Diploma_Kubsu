@@ -54,6 +54,36 @@ Expected workflow:
 4. Adapt repositories and handlers to the generated output.
 5. Run formatting and tests.
 
+## Local Go Runtime
+
+For a direct local Go run of the backend processes:
+
+```bash
+cd api
+./scripts/start_local.sh
+```
+
+The script:
+
+1. sources `api/.env`
+2. exports the variables for child processes
+3. sets workspace-local Go cache directories
+4. starts both `cmd/api` and `cmd/worker`
+5. writes logs into `api/var/log/`
+6. stops both processes together on `Ctrl+C`
+
+Startup now also fails fast when:
+
+- Docling is unreachable
+- TEI is unreachable
+- the configured LLM provider/model is unreachable
+- the configured default ingestion pipeline does not exist
+- the configured default embedding pipeline does not exist
+- the configured default embedding model does not exist
+- chunk size / overlap are invalid
+
+This is intentional. The local runtime should fail at startup for bad configuration instead of surfacing late generic `500` errors during project creation or indexing.
+
 ## How To Add New Backend Behavior
 
 ### New HTTP endpoint behavior

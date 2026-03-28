@@ -69,10 +69,35 @@ oapi-codegen -config oapi-codegen.yaml ../api-docs-swagger/specs/mimir-rag-api.y
    - TEI
    - an LLM provider reachable through the configured `LLM_API_TYPE`
    - ensure `PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION` is valid for the active TEI model
+   - ensure `PROJECT_INDEX_DEFAULTS_EMBEDDING_MODEL_NAME` exists in `embeddings.embedding_models`
 4. Start the API:
    `go run ./cmd/api`
 5. Start the worker in a second terminal:
    `go run ./cmd/worker`
+
+For a one-command local start, use:
+
+```bash
+cd api
+./scripts/start_local.sh
+```
+
+That helper script:
+
+- loads `api/.env`
+- exports the variables for both processes
+- uses workspace-local Go cache/temp directories
+- starts `cmd/api` and `cmd/worker`
+- writes logs to `api/var/log/api.log` and `api/var/log/worker.log`
+- stops both processes together on `Ctrl+C`
+
+Startup now fails fast if:
+
+- Docling is unreachable
+- TEI is unreachable
+- the configured LLM provider/model is unreachable
+- default project index config values are invalid
+- the configured default ingestion pipeline, embedding pipeline, or embedding model do not exist
 
 Detailed setup instructions live in [docs/environment.md](./docs/environment.md) and [docs/deployment.md](./docs/deployment.md).
 
