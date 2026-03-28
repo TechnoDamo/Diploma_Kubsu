@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -128,6 +129,22 @@ func decodeEmbeddings(value any) ([][]float32, error) {
 			}
 			return [][]float32{vector}, nil
 		}
+	case map[string]any:
+		for _, key := range []string{"embeddings", "data", "results"} {
+			if nested, exists := typed[key]; exists {
+				return decodeEmbeddings(nested)
+			}
+		}
+		for _, key := range []string{"embedding", "vector"} {
+			if nested, exists := typed[key]; exists {
+				vector, err := decodeVector(nested)
+				if err != nil {
+					return nil, err
+				}
+				return [][]float32{vector}, nil
+			}
+		}
+		return nil, fmt.Errorf("unexpected tei response object format")
 	default:
 		return nil, fmt.Errorf("unexpected tei response format")
 	}
@@ -146,8 +163,26 @@ func decodeVector(value any) ([]float32, error) {
 			vector = append(vector, float32(number))
 		case float32:
 			vector = append(vector, number)
+		case int:
+			vector = append(vector, float32(number))
+		case int32:
+			vector = append(vector, float32(number))
+		case int64:
+			vector = append(vector, float32(number))
+		case json.Number:
+			parsed, err := number.Float64()
+			if err != nil {
+				return nil, fmt.Errorf("unexpected json number in vector: %w", err)
+			}
+			vector = append(vector, float32(parsed))
+		case string:
+			parsed, err := strconv.ParseFloat(strings.TrimSpace(number), 32)
+			if err != nil {
+				return nil, fmt.Errorf("unexpected string vector element %q", number)
+			}
+			vector = append(vector, float32(parsed))
 		default:
-			return nil, fmt.Errorf("unexpected vector element type")
+			return nil, fmt.Errorf("unexpected vector element type %T", item)
 		}
 	}
 
