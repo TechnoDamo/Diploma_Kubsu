@@ -122,6 +122,16 @@ func decodeEmbeddings(value any) ([][]float32, error) {
 				}
 			}
 			return result, nil
+		case []any:
+			result := make([][]float32, 0, len(typed))
+			for _, item := range typed {
+				vector, err := decodeVector(item)
+				if err != nil {
+					return nil, err
+				}
+				result = append(result, vector)
+			}
+			return result, nil
 		default:
 			vector, err := decodeVector(typed)
 			if err != nil {
