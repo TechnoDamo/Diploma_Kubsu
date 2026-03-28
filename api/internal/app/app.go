@@ -71,7 +71,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		checkCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 		defer cancel()
 
-		if err := teiClient.CheckAvailability(checkCtx, int(cfg.ProjectIndexDefaults.EmbeddingDimension)); err != nil {
+		if err := teiClient.CheckAvailability(checkCtx, cfg.TEI.HealthcheckDimension); err != nil {
 			pool.Close()
 			return nil, fmt.Errorf("tei dependency startup check failed: %w", err)
 		}

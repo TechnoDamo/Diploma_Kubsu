@@ -42,9 +42,9 @@ func (c Client) ConvertFile(ctx context.Context, filename string, data []byte, m
 	}
 
 	_ = writer.WriteField("to_formats", "text")
-	_ = writer.WriteField("target_type", "INBODY")
-	if mimeType != "" {
-		_ = writer.WriteField("from_formats", inferSourceFormat(filename, mimeType))
+	_ = writer.WriteField("target_type", "inbody")
+	if format := inferSourceFormat(filename, mimeType); format != "" {
+		_ = writer.WriteField("from_formats", format)
 	}
 
 	if err := writer.Close(); err != nil {
@@ -65,6 +65,10 @@ func (c Client) ConvertFile(ctx context.Context, filename string, data []byte, m
 	defer response.Body.Close()
 
 	if response.StatusCode >= http.StatusBadRequest {
+		var payload map[string]any
+		if err := json.NewDecoder(response.Body).Decode(&payload); err == nil {
+			return "", fmt.Errorf("docling returned status %d: %v", response.StatusCode, payload)
+		}
 		return "", fmt.Errorf("docling returned status %d", response.StatusCode)
 	}
 
@@ -90,8 +94,6 @@ func inferSourceFormat(filename, mimeType string) string {
 		return "docx"
 	case strings.HasSuffix(lowerName, ".md"), mimeType == "text/markdown":
 		return "md"
-	case strings.HasSuffix(lowerName, ".txt"), strings.HasPrefix(mimeType, "text/plain"):
-		return "text"
 	default:
 		return ""
 	}
