@@ -16,7 +16,8 @@ func NewRouter(application *app.App) http.Handler {
 
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
-	router.Use(middleware.Recoverer)
+	router.Use(jsonRecovererMiddleware(application))
+	router.Use(requestLoggingMiddleware(application))
 
 	router.Get("/healthz", handler.Health)
 

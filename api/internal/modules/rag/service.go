@@ -5,8 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
+	"time"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -34,6 +37,7 @@ type service struct {
 	llm     llm.Client
 	prompts prompts.Bundle
 	cfg     config.Config
+	logger  *slog.Logger
 }
 
 type QueryInput struct {
@@ -69,17 +73,37 @@ type projectRuntimeSettings struct {
 	EmbeddingDimension  int32
 }
 
-func NewService(db *pgxpool.Pool, teiClient tei.Client, llmClient llm.Client, promptBundle prompts.Bundle, cfg config.Config) Service {
+func NewService(
+	db *pgxpool.Pool,
+	teiClient tei.Client,
+	llmClient llm.Client,
+	promptBundle prompts.Bundle,
+	cfg config.Config,
+	logger *slog.Logger,
+) Service {
 	return service{
 		db:      db,
 		tei:     teiClient,
 		llm:     llmClient,
 		prompts: promptBundle,
 		cfg:     cfg,
+		logger:  logger,
 	}
 }
 
 func (s service) Query(ctx context.Context, input QueryInput) (QueryResult, error) {
+	queryStartedAt := time.Now()
+	requestID := chimiddleware.GetReqID(ctx)
+	if s.logger != nil {
+		s.logger.Info(
+			"rag query started",
+			"request_id", requestID,
+			"project_id", input.ProjectID,
+			"target_document_count", len(input.TargetDocumentIDs),
+			"question_length", len([]rune(input.Question)),
+		)
+	}
+
 	state, err := s.getProjectState(ctx, input.ProjectID)
 	if err != nil {
 		return QueryResult{}, err
@@ -101,6 +125,14 @@ func (s service) Query(ctx context.Context, input QueryInput) (QueryResult, erro
 		return QueryResult{}, err
 	}
 	if len(scope) == 0 {
+		if s.logger != nil {
+			s.logger.Info(
+				"rag query completed with empty scope",
+				"request_id", requestID,
+				"project_id", input.ProjectID,
+				"duration_ms", time.Since(queryStartedAt).Milliseconds(),
+			)
+		}
 		return QueryResult{
 			Answer:         "No indexed documents are available for this project.",
 			WarningMessage: warningMessage,
@@ -110,6 +142,9 @@ func (s service) Query(ctx context.Context, input QueryInput) (QueryResult, erro
 
 	effectiveQuestion := input.Question
 	if settings.QueryRewriteEnabled {
+		if s.logger != nil {
+			s.logger.Info("rag query rewrite started", "request_id", requestID, "project_id", input.ProjectID)
+		}
 		rewritten, err := s.rewriteQuestion(ctx, input.Question, settings.projectPromptContext)
 		if err != nil {
 			return QueryResult{}, err
@@ -117,11 +152,32 @@ func (s service) Query(ctx context.Context, input QueryInput) (QueryResult, erro
 		if strings.TrimSpace(rewritten) != "" {
 			effectiveQuestion = rewritten
 		}
+		if s.logger != nil {
+			s.logger.Info(
+				"rag query rewrite completed",
+				"request_id", requestID,
+				"project_id", input.ProjectID,
+				"rewritten_question_length", len([]rune(effectiveQuestion)),
+			)
+		}
 	}
 
+	// Query embeddings are created synchronously because retrieval depends on the
+	// vector immediately. They must match the active project config so pgvector
+	// search compares against chunk embeddings from the same model/version pair.
+	embedStartedAt := time.Now()
 	queryVector, err := s.embedText(ctx, effectiveQuestion, int(settings.EmbeddingDimension))
 	if err != nil {
 		return QueryResult{}, err
+	}
+	if s.logger != nil {
+		s.logger.Info(
+			"rag query embedding completed",
+			"request_id", requestID,
+			"project_id", input.ProjectID,
+			"embedding_dimension", settings.EmbeddingDimension,
+			"duration_ms", time.Since(embedStartedAt).Milliseconds(),
+		)
 	}
 
 	targetIDs := make([]int64, 0, len(scope))
@@ -151,6 +207,7 @@ func (s service) Query(ctx context.Context, input QueryInput) (QueryResult, erro
 	}
 	defer rows.Close()
 
+	retrievalStartedAt := time.Now()
 	citations := make([]Citation, 0, settings.RetrievalTopK)
 	contextParts := make([]string, 0, settings.ContextTopN)
 	for rows.Next() {
@@ -168,9 +225,22 @@ func (s service) Query(ctx context.Context, input QueryInput) (QueryResult, erro
 	if err := rows.Err(); err != nil {
 		return QueryResult{}, fmt.Errorf("iterate rag chunks: %w", err)
 	}
+	if s.logger != nil {
+		s.logger.Info(
+			"rag retrieval completed",
+			"request_id", requestID,
+			"project_id", input.ProjectID,
+			"scope_size", len(scope),
+			"retrieval_top_k", settings.RetrievalTopK,
+			"context_top_n", settings.ContextTopN,
+			"citation_count", len(citations),
+			"duration_ms", time.Since(retrievalStartedAt).Milliseconds(),
+		)
+	}
 
 	answer := s.buildFallbackAnswer(citations)
 	if len(contextParts) > 0 {
+		answerStartedAt := time.Now()
 		llmAnswer, err := s.answerWithLLM(ctx, input.Question, effectiveQuestion, settings.projectPromptContext, contextParts)
 		if err != nil {
 			return QueryResult{}, err
@@ -178,6 +248,25 @@ func (s service) Query(ctx context.Context, input QueryInput) (QueryResult, erro
 		if strings.TrimSpace(llmAnswer) != "" {
 			answer = llmAnswer
 		}
+		if s.logger != nil {
+			s.logger.Info(
+				"rag answer generation completed",
+				"request_id", requestID,
+				"project_id", input.ProjectID,
+				"context_parts", len(contextParts),
+				"duration_ms", time.Since(answerStartedAt).Milliseconds(),
+			)
+		}
+	}
+
+	if s.logger != nil {
+		s.logger.Info(
+			"rag query completed",
+			"request_id", requestID,
+			"project_id", input.ProjectID,
+			"citation_count", len(citations),
+			"duration_ms", time.Since(queryStartedAt).Milliseconds(),
+		)
 	}
 
 	return QueryResult{

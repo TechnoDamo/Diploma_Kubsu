@@ -1,6 +1,7 @@
 import { type PropsWithChildren } from "react";
 import { Link } from "react-router-dom";
 import { env } from "../config/env";
+import { t } from "../i18n";
 
 type AppShellProps = PropsWithChildren<{
   title: string;
@@ -14,15 +15,15 @@ export function AppShell({ title, subtitle, children }: AppShellProps) {
       <header className="hero">
         <div className="hero__noise" />
         <nav className="topnav">
-          <Link to="/projects">Projects</Link>
+          <Link to="/projects">{t.appShell.navProjects}</Link>
           <a href={`${env.apiBaseUrl}/projects`} target="_blank" rel="noreferrer">
             API
           </a>
         </nav>
         <div className="hero__meta">
-          <span className="eyebrow">Mimir RAG Console</span>
+          <span className="eyebrow">{t.appShell.title}</span>
           <span className="runtime-badge">
-            {env.enableMocks ? "Mock switch on" : "Live backend"}
+            {env.enableMocks ? t.appShell.mockMode : t.appShell.liveMode}
           </span>
         </div>
         <h1>{title}</h1>

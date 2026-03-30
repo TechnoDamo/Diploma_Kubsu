@@ -1,0 +1,97 @@
+Procurement and Vendor Control Standard
+Chapter 1: Vendor onboarding, purchase approval, contract review, and supplier monitoring
+
+This chapter describes how the company expects owners, operators, and support teams to run the Vendor onboarding, purchase approval, contract review, and supplier monitoring process with consistent governance, defined approval points, and measurable operational outcomes. Each operating unit is expected to maintain clear ownership, a current control inventory, review cadence, and exception handling for the topics described below. The language is intentionally detailed so that the file is useful both for RAG retrieval and for contradiction-analysis exercises.
+
+Operational teams must document roles, approval paths, and service dependencies before a process is treated as production-ready. The company does not consider an activity mature merely because it is currently working. Mature operations require assigned owners, durable records, escalation paths, metric review, and evidence that the process can withstand staff changes, routine audit questions, and foreseeable failure scenarios.
+
+Managers are expected to review open actions, overdue approvals, unresolved risk acceptances, supplier dependencies, and recovery assumptions at least monthly. Material exceptions must be retained in a visible register with business owner, reason, impact statement, target remediation date, and interim compensating control. Business convenience by itself is not sufficient reason to waive a control indefinitely.
+
+The company prefers standard patterns over locally invented variants when a control affects security, finance, compliance, customer trust, or legal exposure. Local optimization is allowed only when the team can show that the alternative keeps risk at or below the corporate baseline and that downstream teams can still understand, support, and audit the chosen approach.
+
+Evidence matters. Teams must preserve logs, approvals, change tickets, sign-off records, test results, rollback notes, and post-implementation observations in the system of record rather than in informal chat or private notes. A control that cannot be evidenced reliably should be treated as partially implemented.
+
+
+Procurement and Vendor Control Standard
+Chapter 2: Vendor onboarding, purchase approval, contract review, and supplier monitoring
+
+This chapter describes how the company expects owners, operators, and support teams to run the Vendor onboarding, purchase approval, contract review, and supplier monitoring process with consistent governance, defined approval points, and measurable operational outcomes. Each operating unit is expected to maintain clear ownership, a current control inventory, review cadence, and exception handling for the topics described below. The language is intentionally detailed so that the file is useful both for RAG retrieval and for contradiction-analysis exercises.
+
+Operational teams must document roles, approval paths, and service dependencies before a process is treated as production-ready. The company does not consider an activity mature merely because it is currently working. Mature operations require assigned owners, durable records, escalation paths, metric review, and evidence that the process can withstand staff changes, routine audit questions, and foreseeable failure scenarios.
+
+Managers are expected to review open actions, overdue approvals, unresolved risk acceptances, supplier dependencies, and recovery assumptions at least monthly. Material exceptions must be retained in a visible register with business owner, reason, impact statement, target remediation date, and interim compensating control. Business convenience by itself is not sufficient reason to waive a control indefinitely.
+
+The company prefers standard patterns over locally invented variants when a control affects security, finance, compliance, customer trust, or legal exposure. Local optimization is allowed only when the team can show that the alternative keeps risk at or below the corporate baseline and that downstream teams can still understand, support, and audit the chosen approach.
+
+Evidence matters. Teams must preserve logs, approvals, change tickets, sign-off records, test results, rollback notes, and post-implementation observations in the system of record rather than in informal chat or private notes. A control that cannot be evidenced reliably should be treated as partially implemented.
+
+
+Procurement and Vendor Control Standard
+Chapter 3: Vendor onboarding, purchase approval, contract review, and supplier monitoring
+
+This chapter describes how the company expects owners, operators, and support teams to run the Vendor onboarding, purchase approval, contract review, and supplier monitoring process with consistent governance, defined approval points, and measurable operational outcomes. Each operating unit is expected to maintain clear ownership, a current control inventory, review cadence, and exception handling for the topics described below. The language is intentionally detailed so that the file is useful both for RAG retrieval and for contradiction-analysis exercises.
+
+Operational teams must document roles, approval paths, and service dependencies before a process is treated as production-ready. The company does not consider an activity mature merely because it is currently working. Mature operations require assigned owners, durable records, escalation paths, metric review, and evidence that the process can withstand staff changes, routine audit questions, and foreseeable failure scenarios.
+
+Managers are expected to review open actions, overdue approvals, unresolved risk acceptances, supplier dependencies, and recovery assumptions at least monthly. Material exceptions must be retained in a visible register with business owner, reason, impact statement, target remediation date, and interim compensating control. Business convenience by itself is not sufficient reason to waive a control indefinitely.
+
+The company prefers standard patterns over locally invented variants when a control affects security, finance, compliance, customer trust, or legal exposure. Local optimization is allowed only when the team can show that the alternative keeps risk at or below the corporate baseline and that downstream teams can still understand, support, and audit the chosen approach.
+
+Evidence matters. Teams must preserve logs, approvals, change tickets, sign-off records, test results, rollback notes, and post-implementation observations in the system of record rather than in informal chat or private notes. A control that cannot be evidenced reliably should be treated as partially implemented.
+
+
+Procurement and Vendor Control Standard
+Chapter 4: Vendor onboarding, purchase approval, contract review, and supplier monitoring
+
+This chapter describes how the company expects owners, operators, and support teams to run the Vendor onboarding, purchase approval, contract review, and supplier monitoring process with consistent governance, defined approval points, and measurable operational outcomes. Each operating unit is expected to maintain clear ownership, a current control inventory, review cadence, and exception handling for the topics described below. The language is intentionally detailed so that the file is useful both for RAG retrieval and for contradiction-analysis exercises.
+
+Operational teams must document roles, approval paths, and service dependencies before a process is treated as production-ready. The company does not consider an activity mature merely because it is currently working. Mature operations require assigned owners, durable records, escalation paths, metric review, and evidence that the process can withstand staff changes, routine audit questions, and foreseeable failure scenarios.
+
+Managers are expected to review open actions, overdue approvals, unresolved risk acceptances, supplier dependencies, and recovery assumptions at least monthly. Material exceptions must be retained in a visible register with business owner, reason, impact statement, target remediation date, and interim compensating control. Business convenience by itself is not sufficient reason to waive a control indefinitely.
+
+The company prefers standard patterns over locally invented variants when a control affects security, finance, compliance, customer trust, or legal exposure. Local optimization is allowed only when the team can show that the alternative keeps risk at or below the corporate baseline and that downstream teams can still understand, support, and audit the chosen approach.
+
+Evidence matters. Teams must preserve logs, approvals, change tickets, sign-off records, test results, rollback notes, and post-implementation observations in the system of record rather than in informal chat or private notes. A control that cannot be evidenced reliably should be treated as partially implemented.
+
+
+Procurement and Vendor Control Standard
+Chapter 5: Vendor onboarding, purchase approval, contract review, and supplier monitoring
+
+This chapter describes how the company expects owners, operators, and support teams to run the Vendor onboarding, purchase approval, contract review, and supplier monitoring process with consistent governance, defined approval points, and measurable operational outcomes. Each operating unit is expected to maintain clear ownership, a current control inventory, review cadence, and exception handling for the topics described below. The language is intentionally detailed so that the file is useful both for RAG retrieval and for contradiction-analysis exercises.
+
+Operational teams must document roles, approval paths, and service dependencies before a process is treated as production-ready. The company does not consider an activity mature merely because it is currently working. Mature operations require assigned owners, durable records, escalation paths, metric review, and evidence that the process can withstand staff changes, routine audit questions, and foreseeable failure scenarios.
+
+Managers are expected to review open actions, overdue approvals, unresolved risk acceptances, supplier dependencies, and recovery assumptions at least monthly. Material exceptions must be retained in a visible register with business owner, reason, impact statement, target remediation date, and interim compensating control. Business convenience by itself is not sufficient reason to waive a control indefinitely.
+
+The company prefers standard patterns over locally invented variants when a control affects security, finance, compliance, customer trust, or legal exposure. Local optimization is allowed only when the team can show that the alternative keeps risk at or below the corporate baseline and that downstream teams can still understand, support, and audit the chosen approach.
+
+Evidence matters. Teams must preserve logs, approvals, change tickets, sign-off records, test results, rollback notes, and post-implementation observations in the system of record rather than in informal chat or private notes. A control that cannot be evidenced reliably should be treated as partially implemented.
+
+
+Procurement and Vendor Control Standard
+Chapter 6: Vendor onboarding, purchase approval, contract review, and supplier monitoring
+
+This chapter describes how the company expects owners, operators, and support teams to run the Vendor onboarding, purchase approval, contract review, and supplier monitoring process with consistent governance, defined approval points, and measurable operational outcomes. Each operating unit is expected to maintain clear ownership, a current control inventory, review cadence, and exception handling for the topics described below. The language is intentionally detailed so that the file is useful both for RAG retrieval and for contradiction-analysis exercises.
+
+Operational teams must document roles, approval paths, and service dependencies before a process is treated as production-ready. The company does not consider an activity mature merely because it is currently working. Mature operations require assigned owners, durable records, escalation paths, metric review, and evidence that the process can withstand staff changes, routine audit questions, and foreseeable failure scenarios.
+
+Managers are expected to review open actions, overdue approvals, unresolved risk acceptances, supplier dependencies, and recovery assumptions at least monthly. Material exceptions must be retained in a visible register with business owner, reason, impact statement, target remediation date, and interim compensating control. Business convenience by itself is not sufficient reason to waive a control indefinitely.
+
+The company prefers standard patterns over locally invented variants when a control affects security, finance, compliance, customer trust, or legal exposure. Local optimization is allowed only when the team can show that the alternative keeps risk at or below the corporate baseline and that downstream teams can still understand, support, and audit the chosen approach.
+
+Evidence matters. Teams must preserve logs, approvals, change tickets, sign-off records, test results, rollback notes, and post-implementation observations in the system of record rather than in informal chat or private notes. A control that cannot be evidenced reliably should be treated as partially implemented.
+
+
+Procurement and Vendor Control Standard
+Chapter 7: Vendor onboarding, purchase approval, contract review, and supplier monitoring
+
+This chapter describes how the company expects owners, operators, and support teams to run the Vendor onboarding, purchase approval, contract review, and supplier monitoring process with consistent governance, defined approval points, and measurable operational outcomes. Each operating unit is expected to maintain clear ownership, a current control inventory, review cadence, and exception handling for the topics described below. The language is intentionally detailed so that the file is useful both for RAG retrieval and for contradiction-analysis exercises.
+
+Operational teams must document roles, approval paths, and service dependencies before a process is treated as production-ready. The company does not consider an activity mature merely because it is currently working. Mature operations require assigned owners, durable records, escalation paths, metric review, and evidence that the process can withstand staff changes, routine audit questions, and foreseeable failure scenarios.
+
+Managers are expected to review open actions, overdue approvals, unresolved risk acceptances, supplier dependencies, and recovery assumptions at least monthly. Material exceptions must be retained in a visible register with business owner, reason, impact statement, target remediation date, and interim compensating control. Business convenience by itself is not sufficient reason to waive a control indefinitely.
+
+The company prefers standard patterns over locally invented variants when a control affects security, finance, compliance, customer trust, or legal exposure. Local optimization is allowed only when the team can show that the alternative keeps risk at or below the corporate baseline and that downstream teams can still understand, support, and audit the chosen approach.
+
+Evidence matters. Teams must preserve logs, approvals, change tickets, sign-off records, test results, rollback notes, and post-implementation observations in the system of record rather than in informal chat or private notes. A control that cannot be evidenced reliably should be treated as partially implemented.
+

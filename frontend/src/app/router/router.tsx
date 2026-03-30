@@ -3,6 +3,7 @@ import { AnalysisDetailsPage } from "../../pages/analysis-details/AnalysisDetail
 import { DocumentDetailsPage } from "../../pages/document-details/DocumentDetailsPage";
 import { ProjectDetailsPage } from "../../pages/project-details/ProjectDetailsPage";
 import { ProjectsListPage } from "../../pages/projects-list/ProjectsListPage";
+import { t } from "../../shared/i18n";
 import { AppShell } from "../../shared/ui/AppShell";
 
 export const router = createBrowserRouter([
@@ -29,9 +30,9 @@ export const router = createBrowserRouter([
   {
     path: "*",
     element: (
-      <AppShell title="Not Found" subtitle="The requested route does not exist.">
+      <AppShell title={t.router.notFoundTitle} subtitle={t.router.notFoundSubtitle}>
         <section className="panel">
-          <p>Use the navigation to return to a valid page.</p>
+          <p>{t.router.notFoundBody}</p>
         </section>
       </AppShell>
     ),

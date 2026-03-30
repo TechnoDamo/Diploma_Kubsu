@@ -6,9 +6,14 @@ import {
   useDocumentText,
 } from "../../features/documents/documents.queries";
 import { readApiErrorMessage, isApiError } from "../../shared/api/errors";
+import { t } from "../../shared/i18n";
 import { parseRouteId } from "../../shared/lib/ids";
 import type { DocumentId, ProjectId } from "../../shared/types/api";
 import { AppShell } from "../../shared/ui/AppShell";
+
+function formatDocumentStatus(status: string) {
+  return t.shared.statusDocument(status as never);
+}
 
 export function DocumentDetailsPage() {
   const { projectId, documentId } = useParams();
@@ -31,12 +36,12 @@ export function DocumentDetailsPage() {
   if (!typedProjectId || !typedDocumentId) {
     return (
       <AppShell
-        title="Invalid Document Route"
-        subtitle="The requested document path is malformed."
+        title={t.documentDetails.invalid.title}
+        subtitle={t.documentDetails.invalid.subtitle}
       >
         <section className="panel">
-          <p className="error">Project ID and document ID must both be positive integers.</p>
-          <Link to="/projects">Return to projects</Link>
+          <p className="error">{t.documentDetails.invalid.body}</p>
+          <Link to="/projects">{t.shared.backToProjects}</Link>
         </section>
       </AppShell>
     );
@@ -70,18 +75,18 @@ export function DocumentDetailsPage() {
 
   return (
     <AppShell
-      title={documentQuery.data?.name ?? "Document"}
-      subtitle="Inspect document state, reconstructed text, and original content while the backend indexing pipeline progresses."
+      title={documentQuery.data?.name ?? t.documentDetails.titleFallback}
+      subtitle={t.documentDetails.subtitle}
     >
       <section className="hero-bar">
         <Link className="pill pill--ghost" to={`/projects/${typedProjectId}`}>
-          Back to project
+          {t.shared.backToProject}
         </Link>
         {documentQuery.data && (
           <>
             <span className="pill">#{documentQuery.data.id}</span>
             <span className="pill">{documentQuery.data.mime_type}</span>
-            <span className="pill">{documentQuery.data.status}</span>
+            <span className="pill">{formatDocumentStatus(documentQuery.data.status)}</span>
           </>
         )}
       </section>
@@ -90,32 +95,30 @@ export function DocumentDetailsPage() {
         <section className="panel panel--glow">
           <div className="section-head">
             <div>
-              <span className="section-kicker">Metadata</span>
-              <h2>Document status</h2>
+              <span className="section-kicker">{t.documentDetails.metadata.kicker}</span>
+              <h2>{t.documentDetails.metadata.title}</h2>
             </div>
           </div>
-        {documentQuery.isLoading && <p className="muted">Loading document...</p>}
+          {documentQuery.isLoading && <p className="muted">{t.documentDetails.metadata.loading}</p>}
         {documentQuery.isError && (
           <p className="error">
-            {readApiErrorMessage(documentQuery.error, "Failed to load document metadata.")}
+            {readApiErrorMessage(
+              documentQuery.error,
+              t.documentDetails.errors.metadata,
+            )}
           </p>
         )}
         {documentQuery.data && (
           <>
             <div className="chips">
-              <span>{documentQuery.data.status}</span>
+              <span>{formatDocumentStatus(documentQuery.data.status)}</span>
               <span>{documentQuery.data.mime_type}</span>
               <span>{Math.round(documentQuery.data.size_bytes / 1024)} KB</span>
             </div>
-            <p className="muted">ID: {documentQuery.data.id}</p>
-            <p className="muted">
-              Last updated {new Date(documentQuery.data.updated_at).toLocaleString()}
-            </p>
+            <p className="muted">{t.documentDetails.metadata.id(documentQuery.data.id)}</p>
+            <p className="muted">{t.documentDetails.metadata.updated(documentQuery.data.updated_at)}</p>
             {documentQuery.data.status === "failed" && (
-              <p className="warning">
-                Processing failed. This often means the parser or downstream indexing pipeline
-                rejected the file.
-              </p>
+              <p className="warning">{t.documentDetails.metadata.failedWarning}</p>
             )}
             <button
               type="button"
@@ -123,7 +126,9 @@ export function DocumentDetailsPage() {
               onClick={() => void documentQuery.refetch()}
               disabled={documentQuery.isFetching}
             >
-              {documentQuery.isFetching ? "Refreshing..." : "Refresh status"}
+              {documentQuery.isFetching
+                ? t.documentDetails.metadata.refreshing
+                : t.documentDetails.metadata.refresh}
             </button>
           </>
         )}
@@ -132,19 +137,22 @@ export function DocumentDetailsPage() {
         <section className="panel">
           <div className="section-head">
             <div>
-              <span className="section-kicker">Text view</span>
-              <h2>Extracted text</h2>
+              <span className="section-kicker">{t.documentDetails.text.kicker}</span>
+              <h2>{t.documentDetails.text.title}</h2>
             </div>
           </div>
-        {documentTextQuery.isLoading && <p className="muted">Loading extracted text...</p>}
+          {documentTextQuery.isLoading && (
+            <p className="muted">{t.documentDetails.text.loading}</p>
+          )}
         {textPending && (
-          <p className="muted">
-            Extracted text is not ready yet. Keep this page open while processing continues.
-          </p>
+          <p className="muted">{t.documentDetails.text.pending}</p>
         )}
         {documentTextQuery.isError && !textPending && (
           <p className="error">
-            {readApiErrorMessage(documentTextQuery.error, "Failed to load extracted text.")}
+            {readApiErrorMessage(
+              documentTextQuery.error,
+              t.documentDetails.errors.text,
+            )}
           </p>
         )}
         {documentTextQuery.data && (
@@ -156,7 +164,9 @@ export function DocumentDetailsPage() {
           onClick={() => void documentTextQuery.refetch()}
           disabled={documentTextQuery.isFetching}
         >
-          {documentTextQuery.isFetching ? "Checking..." : "Check text availability"}
+          {documentTextQuery.isFetching
+            ? t.documentDetails.text.checking
+            : t.documentDetails.text.check}
         </button>
         </section>
       </section>
@@ -164,30 +174,37 @@ export function DocumentDetailsPage() {
       <section className="panel">
         <div className="section-head">
           <div>
-            <span className="section-kicker">Source file</span>
-            <h2>Original content</h2>
+            <span className="section-kicker">{t.documentDetails.content.kicker}</span>
+            <h2>{t.documentDetails.content.title}</h2>
           </div>
         </div>
-        <p className="muted">
-          This uses `/content` and downloads the raw file as a browser object URL.
-        </p>
+        <p className="muted">{t.documentDetails.content.body}</p>
         <button
           type="button"
           className="btn-secondary"
           onClick={() => void documentContentQuery.refetch()}
           disabled={documentContentQuery.isFetching}
         >
-          {documentContentQuery.isFetching ? "Preparing..." : "Load content"}
+          {documentContentQuery.isFetching
+            ? t.documentDetails.content.loading
+            : t.documentDetails.content.load}
         </button>
         {documentContentQuery.isError && (
           <p className="error">
-            {readApiErrorMessage(documentContentQuery.error, "Failed to load document content.")}
+            {readApiErrorMessage(
+              documentContentQuery.error,
+              t.documentDetails.errors.content,
+            )}
           </p>
         )}
         {downloadUrl && (
           <p>
-            <a className="text-link" href={downloadUrl} download={documentQuery.data?.name || "document"}>
-              Download file
+            <a
+              className="text-link"
+              href={downloadUrl}
+              download={documentQuery.data?.name || "document"}
+            >
+              {t.documentDetails.content.download}
             </a>
           </p>
         )}

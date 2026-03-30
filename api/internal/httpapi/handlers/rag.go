@@ -60,6 +60,7 @@ func (h Handler) QueryRAG(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, rag.ErrLLMUnavailable):
 			respondError(w, http.StatusServiceUnavailable, "LLM_DEPENDENCY_UNAVAILABLE", "LLM service is unavailable.")
 		default:
+			h.logInternalError(r, "query rag", err, "project_id", projectID, "target_document_count", len(req.TargetDocumentIDs))
 			respondError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Unexpected internal server error.")
 		}
 		return

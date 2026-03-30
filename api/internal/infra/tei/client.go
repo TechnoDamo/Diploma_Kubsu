@@ -16,11 +16,14 @@ type Client struct {
 	httpClient *http.Client
 }
 
-func New(baseURL string) Client {
+func New(baseURL string, timeout time.Duration) Client {
+	if timeout <= 0 {
+		timeout = 180 * time.Second
+	}
 	return Client{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		httpClient: &http.Client{
-			Timeout: 60 * time.Second,
+			Timeout: timeout,
 		},
 	}
 }
@@ -50,6 +53,8 @@ func (c Client) Embed(ctx context.Context, inputs []string, dimensions int) ([][
 		return nil, fmt.Errorf("embed inputs must not be empty")
 	}
 
+	// The backend uses the same TEI contract for indexing batches and single
+	// query embeddings during retrieval.
 	requestBody := map[string]any{
 		"inputs": inputs,
 	}
@@ -84,6 +89,8 @@ func (c Client) Embed(ctx context.Context, inputs []string, dimensions int) ([][
 		return nil, fmt.Errorf("decode tei response: %w", err)
 	}
 
+	// Different TEI-compatible deployments may wrap the returned vectors in
+	// slightly different JSON envelopes, so decoding accepts several shapes.
 	vectors, err := decodeEmbeddings(raw)
 	if err != nil {
 		return nil, err

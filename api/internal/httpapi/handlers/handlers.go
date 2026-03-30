@@ -23,9 +23,14 @@ func New(application *app.App) Handler {
 }
 
 func respondJSON(w http.ResponseWriter, status int, payload any) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		body = []byte(`{"error":{"code":"INTERNAL_SERVER_ERROR","message":"Unexpected internal server error."}}` + "\n")
+		status = http.StatusInternalServerError
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
+	_, _ = w.Write(body)
 }
 
 type errorDetail struct {

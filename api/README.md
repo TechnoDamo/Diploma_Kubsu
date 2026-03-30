@@ -34,6 +34,7 @@ More implementation detail lives in:
 
 - [docs/technology-choices.md](./docs/technology-choices.md)
 - [docs/workflows.md](./docs/workflows.md)
+- [docs/embedding-pipeline.md](./docs/embedding-pipeline.md)
 - [docs/development.md](./docs/development.md)
 - [docs/environment.md](./docs/environment.md)
 - [docs/deployment.md](./docs/deployment.md)
@@ -91,6 +92,21 @@ That helper script:
 - writes logs to `api/var/log/api.log` and `api/var/log/worker.log`
 - stops both processes together on `Ctrl+C`
 
+To watch the resulting logs in real time with color and pretty-printed JSON, use:
+
+```bash
+cd api
+./scripts/watch_logs.sh
+./scripts/watch_logs.sh api
+./scripts/watch_logs.sh worker
+```
+
+Notes:
+
+- `both` is the default mode
+- if `jq` is installed, JSON logs are formatted and colorized
+- without `jq`, the script still follows logs, but leaves each line as raw JSON
+
 Startup now fails fast if:
 
 - Docling is unreachable
@@ -100,6 +116,14 @@ Startup now fails fast if:
 - the configured default ingestion pipeline, embedding pipeline, or embedding model do not exist
 
 Detailed setup instructions live in [docs/environment.md](./docs/environment.md) and [docs/deployment.md](./docs/deployment.md).
+
+Key throughput knobs now include:
+
+- `TEI_EMBED_BATCH_SIZE`
+- `MAX_EMBEDDING_CONCURRENT_REQUESTS`
+- `CONTRADICTION_MAX_CANDIDATES_PER_TARGET`
+- `MAX_CONTRADICTION_RETRIEVAL_CONCURRENT_TARGETS`
+- `MAX_CONTRADICTION_LLM_CONCURRENT_REQUESTS`
 
 ## Container-First Local Stack
 

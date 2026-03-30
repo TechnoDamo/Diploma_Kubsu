@@ -14,6 +14,7 @@ const supportedUploadTypes = new Set([
   "application/pdf",
   "text/plain",
   "text/markdown",
+  "text/html",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
 

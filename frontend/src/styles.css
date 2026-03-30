@@ -240,6 +240,87 @@ textarea {
   line-height: 1.5;
 }
 
+.markdown-content {
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.markdown-content > :first-child {
+  margin-top: 0;
+}
+
+.markdown-content > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content p,
+.markdown-content ul,
+.markdown-content ol,
+.markdown-content pre,
+.markdown-content blockquote,
+.markdown-content table {
+  margin: 0.65rem 0;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 1.2rem;
+}
+
+.markdown-content li + li {
+  margin-top: 0.28rem;
+}
+
+.markdown-content code {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.92em;
+  padding: 0.08rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(73, 231, 255, 0.1);
+  color: var(--accent);
+}
+
+.markdown-content pre {
+  overflow-x: auto;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(6, 10, 18, 0.95);
+}
+
+.markdown-content pre code {
+  display: block;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+}
+
+.markdown-content blockquote {
+  margin-left: 0;
+  padding: 0.2rem 0 0.2rem 1rem;
+  border-left: 2px solid var(--line-strong);
+  color: var(--text-soft);
+}
+
+.markdown-content a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: rgba(73, 231, 255, 0.4);
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.markdown-content th,
+.markdown-content td {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  text-align: left;
+}
+
 .panel {
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -531,6 +612,14 @@ button:disabled {
   align-items: center;
 }
 
+.result-card__subhead {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
 .result-card h3,
 .result-card h4 {
   margin: 0 0 0.75rem;
@@ -556,6 +645,133 @@ button:disabled {
 .evidence-list p {
   margin: 0.25rem 0 0;
   color: var(--text-soft);
+}
+
+.citation-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(5, 9, 16, 0.58);
+  overflow: hidden;
+}
+
+.citation-card[open] {
+  border-color: var(--line-strong);
+  background: rgba(8, 13, 22, 0.78);
+}
+
+.citation-card__summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.9rem 1rem;
+}
+
+.citation-card__summary::-webkit-details-marker {
+  display: none;
+}
+
+.citation-card__title {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.65rem;
+  align-items: baseline;
+}
+
+.citation-card__meta {
+  color: var(--text-dim);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.74rem;
+}
+
+.citation-card__preview {
+  margin: 0.45rem 0 0;
+  color: var(--text-soft);
+}
+
+.citation-card__body {
+  padding: 0 1rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.citation-card__section + .citation-card__section {
+  margin-top: 1rem;
+}
+
+.citation-card__source-link {
+  display: inline-flex;
+  margin-top: 0.15rem;
+}
+
+.citation-card__meta-line {
+  margin: 0.45rem 0 0;
+  color: var(--text-dim);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.74rem;
+}
+
+.analysis-card,
+.evidence-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(5, 9, 16, 0.58);
+  overflow: hidden;
+}
+
+.analysis-card[open],
+.evidence-card[open] {
+  border-color: var(--line-strong);
+  background: rgba(8, 13, 22, 0.78);
+}
+
+.analysis-card__summary,
+.evidence-card__summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.analysis-card__summary::-webkit-details-marker,
+.evidence-card__summary::-webkit-details-marker {
+  display: none;
+}
+
+.analysis-card__summary {
+  padding: 0.95rem 1rem;
+}
+
+.analysis-card__title {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.analysis-card__title h4 {
+  margin: 0;
+}
+
+.analysis-card__title p {
+  margin: 0.3rem 0 0;
+  color: var(--text-dim);
+}
+
+.analysis-card__preview,
+.evidence-card__preview {
+  margin: 0.55rem 0 0;
+  color: var(--text-soft);
+}
+
+.analysis-card__body {
+  padding: 0 1rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.evidence-card__summary {
+  padding: 0.85rem 0.95rem;
+}
+
+.evidence-card__body {
+  padding: 0 0.95rem 0.95rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .summary-block__label {

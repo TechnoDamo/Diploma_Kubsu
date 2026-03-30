@@ -11,7 +11,8 @@ The easiest way to deploy this component is by using the pre-built Docker contai
 docker run -d \
   --name docling-serve \
   --restart unless-stopped \
+  --gpus all \
   -p 5001:5001 \
   -e DOCLING_SERVE_ENABLE_UI=1 \
-  quay.io/docling-project/docling-serve
+  quay.io/docling-project/docling-serve:latest
 ```

@@ -6,11 +6,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/sync/errgroup"
 
 	"mimir/api/internal/config"
 	"mimir/api/internal/infra/llm"
@@ -36,6 +41,7 @@ type service struct {
 	llm     llm.Client
 	prompts prompts.Bundle
 	cfg     config.Config
+	logger  *slog.Logger
 }
 
 type StartContradictionAnalysisInput struct {
@@ -80,21 +86,53 @@ type scopedDocument struct {
 	Name string
 }
 
+type targetDocument struct {
+	ID   int64
+	Name string
+}
+
+type analysisCandidate struct {
+	TargetDocumentID   int64
+	TargetDocumentName string
+	BaseText           string
+	TargetText         string
+	BaseOrder          int
+	TargetOrder        int
+	Distance           float64
+}
+
 type projectPromptContext struct {
 	Description *string
 	Context     string
 }
 
-func NewService(db *pgxpool.Pool, llmClient llm.Client, promptBundle prompts.Bundle, cfg config.Config) Service {
+func NewService(
+	db *pgxpool.Pool,
+	llmClient llm.Client,
+	promptBundle prompts.Bundle,
+	cfg config.Config,
+	logger *slog.Logger,
+) Service {
 	return service{
 		db:      db,
 		llm:     llmClient,
 		prompts: promptBundle,
 		cfg:     cfg,
+		logger:  logger,
 	}
 }
 
 func (s service) StartContradictionAnalysis(ctx context.Context, input StartContradictionAnalysisInput) (AcceptedJob, error) {
+	requestID := chimiddleware.GetReqID(ctx)
+	if s.logger != nil {
+		s.logger.Info(
+			"contradiction analysis requested",
+			"request_id", requestID,
+			"project_id", input.ProjectID,
+			"base_document_id", input.BaseDocumentID,
+			"requested_target_count", len(input.TargetDocumentIDs),
+		)
+	}
 	state, err := s.getProjectState(ctx, input.ProjectID)
 	if err != nil {
 		return AcceptedJob{}, err
@@ -177,6 +215,17 @@ func (s service) StartContradictionAnalysis(ctx context.Context, input StartCont
 
 	if err := tx.Commit(ctx); err != nil {
 		return AcceptedJob{}, fmt.Errorf("commit contradiction analysis tx: %w", err)
+	}
+
+	if s.logger != nil {
+		s.logger.Info(
+			"contradiction analysis job queued",
+			"request_id", requestID,
+			"project_id", input.ProjectID,
+			"job_id", jobID,
+			"base_document_id", input.BaseDocumentID,
+			"effective_target_count", len(scope),
+		)
 	}
 
 	return AcceptedJob{
@@ -265,8 +314,26 @@ func (s service) ProcessNextQueuedJob(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("commit analysis claim tx: %w", err)
 	}
 
+	if s.logger != nil {
+		s.logger.Info(
+			"analysis job claimed",
+			"job_id", job.ID,
+			"project_id", job.ProjectID,
+			"base_document_id", job.BaseDocumentID,
+		)
+	}
+
 	results, processErr := s.processClaimedJob(ctx, job.ID, job.ProjectID, job.BaseDocumentID)
 	if processErr != nil {
+		if s.logger != nil {
+			s.logger.Error(
+				"analysis job failed",
+				"job_id", job.ID,
+				"project_id", job.ProjectID,
+				"base_document_id", job.BaseDocumentID,
+				"error", processErr,
+			)
+		}
 		_, _ = s.db.Exec(ctx, `
 			UPDATE analysis.analysis_jobs
 			SET status = 'failed',
@@ -293,19 +360,25 @@ func (s service) ProcessNextQueuedJob(ctx context.Context) (bool, error) {
 		return true, fmt.Errorf("mark analysis job completed: %w", err)
 	}
 
+	if s.logger != nil {
+		s.logger.Info(
+			"analysis job completed",
+			"job_id", job.ID,
+			"project_id", job.ProjectID,
+			"base_document_id", job.BaseDocumentID,
+			"result_count", len(results),
+		)
+	}
+
 	return true, nil
 }
 
 func (s service) processClaimedJob(ctx context.Context, jobID, projectID, baseDocumentID int64) ([]ContradictionResult, error) {
-	type targetDocument struct {
-		ID   int64
-		Name string
-	}
-
 	projectContext, err := s.loadProjectPromptContext(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
+	processStartedAt := time.Now()
 
 	rows, err := s.db.Query(ctx, `
 		SELECT t.document_id, d.name
@@ -331,66 +404,343 @@ func (s service) processClaimedJob(ctx context.Context, jobID, projectID, baseDo
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate analysis targets: %w", err)
 	}
+	if s.logger != nil {
+		s.logger.Info(
+			"analysis target scope loaded",
+			"job_id", jobID,
+			"project_id", projectID,
+			"base_document_id", baseDocumentID,
+			"target_count", len(targets),
+		)
+	}
 
 	maxPairs := s.cfg.ContradictionMaxPairsPerJob
 	if maxPairs < 1 {
 		maxPairs = 1
 	}
-	remainingPairs := maxPairs
 
-	results := make([]ContradictionResult, 0, len(targets))
+	candidates, err := s.collectCandidatesAcrossTargets(ctx, jobID, baseDocumentID, targets)
+	if err != nil {
+		return nil, err
+	}
+	if s.logger != nil {
+		s.logger.Info(
+			"analysis candidate merge completed",
+			"job_id", jobID,
+			"project_id", projectID,
+			"base_document_id", baseDocumentID,
+			"candidate_count", len(candidates),
+		)
+	}
+
+	selectedCandidates := s.selectCandidatesForEvaluation(candidates, maxPairs)
+	if s.logger != nil {
+		s.logger.Info(
+			"analysis candidate selection completed",
+			"job_id", jobID,
+			"project_id", projectID,
+			"base_document_id", baseDocumentID,
+			"selected_candidate_count", len(selectedCandidates),
+			"max_pairs_per_job", maxPairs,
+		)
+	}
+
+	groupedContradictions, err := s.evaluateCandidates(ctx, jobID, projectContext, selectedCandidates)
+	if err != nil {
+		return nil, err
+	}
+	if s.logger != nil {
+		s.logger.Info(
+			"analysis candidate evaluation completed",
+			"job_id", jobID,
+			"project_id", projectID,
+			"base_document_id", baseDocumentID,
+			"selected_candidate_count", len(selectedCandidates),
+			"contradiction_target_count", len(groupedContradictions),
+		)
+	}
+
+	results, err := s.summarizeContradictionsByTarget(ctx, jobID, projectContext, targets, groupedContradictions)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.logger != nil {
+		s.logger.Info(
+			"analysis processing completed",
+			"job_id", jobID,
+			"project_id", projectID,
+			"base_document_id", baseDocumentID,
+			"result_count", len(results),
+			"duration_ms", time.Since(processStartedAt).Milliseconds(),
+		)
+	}
+
+	return results, nil
+}
+
+func (s service) collectCandidatesAcrossTargets(
+	ctx context.Context,
+	jobID int64,
+	baseDocumentID int64,
+	targets []targetDocument,
+) ([]analysisCandidate, error) {
+	if len(targets) == 0 {
+		return nil, nil
+	}
+
+	maxConcurrentTargets := s.cfg.ContradictionRetrievalConcurrentTargets
+	if maxConcurrentTargets < 1 {
+		maxConcurrentTargets = 1
+	}
+	maxCandidatesPerTarget := s.cfg.ContradictionMaxCandidatesPerTarget
+	if maxCandidatesPerTarget < 1 {
+		maxCandidatesPerTarget = 1
+	}
+
+	var (
+		mu         sync.Mutex
+		candidates = make([]analysisCandidate, 0)
+	)
+
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(maxConcurrentTargets)
+
 	for _, target := range targets {
-		if remainingPairs <= 0 {
-			break
-		}
-
-		pairs, err := s.findCandidatePairs(ctx, baseDocumentID, target.ID)
-		if err != nil {
-			return nil, err
-		}
-		if len(pairs) > remainingPairs {
-			pairs = pairs[:remainingPairs]
-		}
-
-		contradictions := make([]Contradiction, 0)
-		for _, pair := range pairs {
-			item, ok, err := s.evaluatePair(ctx, projectContext, pair.baseText, pair.targetText, pair.baseOrder, pair.targetOrder)
+		target := target
+		group.Go(func() error {
+			candidateStartedAt := time.Now()
+			pairs, err := s.findCandidatePairs(groupCtx, baseDocumentID, target.ID)
 			if err != nil {
-				return nil, err
+				return err
 			}
-			remainingPairs--
-			if ok {
-				contradictions = append(contradictions, item)
+			if len(pairs) > maxCandidatesPerTarget {
+				pairs = pairs[:maxCandidatesPerTarget]
 			}
-			if remainingPairs <= 0 {
-				break
+
+			targetCandidates := make([]analysisCandidate, 0, len(pairs))
+			for _, pair := range pairs {
+				targetCandidates = append(targetCandidates, analysisCandidate{
+					TargetDocumentID:   target.ID,
+					TargetDocumentName: target.Name,
+					BaseText:           pair.baseText,
+					TargetText:         pair.targetText,
+					BaseOrder:          pair.baseOrder,
+					TargetOrder:        pair.targetOrder,
+					Distance:           pair.distance,
+				})
 			}
-		}
 
-		if len(contradictions) == 0 {
-			continue
-		}
+			if s.logger != nil {
+				s.logger.Info(
+					"analysis candidate retrieval completed",
+					"job_id", jobID,
+					"target_document_id", target.ID,
+					"candidate_count", len(targetCandidates),
+					"max_candidates_per_target", maxCandidatesPerTarget,
+					"duration_ms", time.Since(candidateStartedAt).Milliseconds(),
+				)
+			}
 
-		sort.Slice(contradictions, func(i, j int) bool {
-			return contradictions[i].Confidence > contradictions[j].Confidence
-		})
-
-		summary, err := s.summarizeTargetContradictions(ctx, projectContext, target.Name, contradictions)
-		if err != nil {
-			return nil, err
-		}
-		summary = strings.TrimSpace(summary)
-		if summary == "" {
-			return nil, fmt.Errorf("llm contradiction summary returned empty text for target document %d", target.ID)
-		}
-
-		results = append(results, ContradictionResult{
-			TargetDocumentID:   target.ID,
-			TargetDocumentName: target.Name,
-			Summary:            summary,
-			Contradictions:     contradictions,
+			mu.Lock()
+			candidates = append(candidates, targetCandidates...)
+			mu.Unlock()
+			return nil
 		})
 	}
+
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].Distance == candidates[j].Distance {
+			if candidates[i].TargetDocumentID == candidates[j].TargetDocumentID {
+				if candidates[i].BaseOrder == candidates[j].BaseOrder {
+					return candidates[i].TargetOrder < candidates[j].TargetOrder
+				}
+				return candidates[i].BaseOrder < candidates[j].BaseOrder
+			}
+			return candidates[i].TargetDocumentID < candidates[j].TargetDocumentID
+		}
+		return candidates[i].Distance < candidates[j].Distance
+	})
+
+	return candidates, nil
+}
+
+func (s service) selectCandidatesForEvaluation(candidates []analysisCandidate, maxPairs int) []analysisCandidate {
+	if maxPairs < 1 {
+		maxPairs = 1
+	}
+
+	selected := make([]analysisCandidate, 0, min(maxPairs, len(candidates)))
+	seen := make(map[string]struct{}, len(candidates))
+
+	for _, candidate := range candidates {
+		key := fmt.Sprintf("%d:%d", candidate.TargetDocumentID, candidate.BaseOrder)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		selected = append(selected, candidate)
+		if len(selected) >= maxPairs {
+			break
+		}
+	}
+
+	return selected
+}
+
+func (s service) evaluateCandidates(
+	ctx context.Context,
+	jobID int64,
+	projectContext projectPromptContext,
+	candidates []analysisCandidate,
+) (map[int64][]Contradiction, error) {
+	if len(candidates) == 0 {
+		return map[int64][]Contradiction{}, nil
+	}
+
+	maxConcurrentLLM := s.cfg.ContradictionLLMConcurrentRequests
+	if maxConcurrentLLM < 1 {
+		maxConcurrentLLM = 1
+	}
+
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(maxConcurrentLLM)
+
+	grouped := make(map[int64][]Contradiction)
+	var mu sync.Mutex
+
+	for _, candidate := range candidates {
+		candidate := candidate
+		group.Go(func() error {
+			item, ok, err := s.evaluatePair(
+				groupCtx,
+				projectContext,
+				candidate.BaseText,
+				candidate.TargetText,
+				candidate.BaseOrder,
+				candidate.TargetOrder,
+			)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return nil
+			}
+
+			mu.Lock()
+			grouped[candidate.TargetDocumentID] = append(grouped[candidate.TargetDocumentID], item)
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+
+	if s.logger != nil {
+		totalContradictions := 0
+		for _, items := range grouped {
+			totalContradictions += len(items)
+		}
+		s.logger.Info(
+			"analysis candidate evaluation grouped",
+			"job_id", jobID,
+			"evaluated_candidate_count", len(candidates),
+			"contradiction_count", totalContradictions,
+			"contradiction_target_count", len(grouped),
+		)
+	}
+
+	return grouped, nil
+}
+
+func (s service) summarizeContradictionsByTarget(
+	ctx context.Context,
+	jobID int64,
+	projectContext projectPromptContext,
+	targets []targetDocument,
+	groupedContradictions map[int64][]Contradiction,
+) ([]ContradictionResult, error) {
+	if len(groupedContradictions) == 0 {
+		return nil, nil
+	}
+
+	maxConcurrentLLM := s.cfg.ContradictionLLMConcurrentRequests
+	if maxConcurrentLLM < 1 {
+		maxConcurrentLLM = 1
+	}
+
+	targetOrder := make(map[int64]int, len(targets))
+	targetNames := make(map[int64]string, len(targets))
+	for index, target := range targets {
+		targetOrder[target.ID] = index
+		targetNames[target.ID] = target.Name
+	}
+
+	results := make([]ContradictionResult, 0, len(groupedContradictions))
+	var mu sync.Mutex
+
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(maxConcurrentLLM)
+
+	for targetID, contradictions := range groupedContradictions {
+		targetID := targetID
+		contradictions := append([]Contradiction(nil), contradictions...)
+		group.Go(func() error {
+			sort.Slice(contradictions, func(i, j int) bool {
+				if contradictions[i].Confidence == contradictions[j].Confidence {
+					if contradictions[i].BaseChunkOrder == contradictions[j].BaseChunkOrder {
+						return contradictions[i].TargetChunkOrder < contradictions[j].TargetChunkOrder
+					}
+					return contradictions[i].BaseChunkOrder < contradictions[j].BaseChunkOrder
+				}
+				return contradictions[i].Confidence > contradictions[j].Confidence
+			})
+
+			summaryStartedAt := time.Now()
+			summary, err := s.summarizeTargetContradictions(groupCtx, projectContext, targetNames[targetID], contradictions)
+			if err != nil {
+				return err
+			}
+			summary = strings.TrimSpace(summary)
+			if summary == "" {
+				return fmt.Errorf("llm contradiction summary returned empty text for target document %d", targetID)
+			}
+
+			if s.logger != nil {
+				s.logger.Info(
+					"analysis target summary completed",
+					"job_id", jobID,
+					"target_document_id", targetID,
+					"contradiction_count", len(contradictions),
+					"duration_ms", time.Since(summaryStartedAt).Milliseconds(),
+				)
+			}
+
+			mu.Lock()
+			results = append(results, ContradictionResult{
+				TargetDocumentID:   targetID,
+				TargetDocumentName: targetNames[targetID],
+				Summary:            summary,
+				Contradictions:     contradictions,
+			})
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		return targetOrder[results[i].TargetDocumentID] < targetOrder[results[j].TargetDocumentID]
+	})
 
 	return results, nil
 }

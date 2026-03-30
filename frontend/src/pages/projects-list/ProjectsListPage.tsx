@@ -6,8 +6,10 @@ import {
   useProjects,
 } from "../../features/projects/projects.queries";
 import { readApiErrorMessage } from "../../shared/api/errors";
+import { t } from "../../shared/i18n";
 import { AppShell } from "../../shared/ui/AppShell";
 import type { ProjectId } from "../../shared/types/api";
+import { MarkdownContent } from "../../shared/ui/MarkdownContent";
 
 export function ProjectsListPage() {
   const [page] = useState(1);
@@ -22,11 +24,11 @@ export function ProjectsListPage() {
   const canSubmit = useMemo(() => name.trim().length > 0, [name]);
 
   const createError = createProjectMutation.isError
-    ? readApiErrorMessage(createProjectMutation.error, "Failed to create project.")
+    ? readApiErrorMessage(createProjectMutation.error, t.projectsList.errors.create)
     : null;
 
   const listError = isError
-    ? readApiErrorMessage(error, "Failed to load projects.")
+    ? readApiErrorMessage(error, t.projectsList.errors.load)
     : null;
 
   function handleCreateProject(event: React.FormEvent<HTMLFormElement>) {
@@ -49,9 +51,7 @@ export function ProjectsListPage() {
   }
 
   function handleDeleteProject(projectId: ProjectId) {
-    const confirmed = window.confirm(
-      "Delete this project? All documents and related analysis jobs will be removed.",
-    );
+    const confirmed = window.confirm(t.projectsList.confirmDelete);
     if (!confirmed) {
       return;
     }
@@ -60,24 +60,24 @@ export function ProjectsListPage() {
 
   return (
     <AppShell
-      title="Mission Control"
-      subtitle="Create research workspaces, ingest source material, and run retrieval and contradiction workflows against the live backend."
+      title={t.projectsList.title}
+      subtitle={t.projectsList.subtitle}
     >
       <section className="metrics-grid">
         <article className="metric-card">
-          <span className="metric-card__label">Projects loaded</span>
+          <span className="metric-card__label">{t.projectsList.metrics.loadedLabel}</span>
           <strong>{data?.total ?? 0}</strong>
-          <p>Workspaces available for ingestion and retrieval.</p>
+          <p>{t.projectsList.metrics.loadedBody}</p>
         </article>
         <article className="metric-card">
-          <span className="metric-card__label">Backend mode</span>
-          <strong>Live API</strong>
-          <p>No mock data is used unless explicitly enabled through env.</p>
+          <span className="metric-card__label">{t.projectsList.metrics.backendModeLabel}</span>
+          <strong>{t.projectsList.metrics.backendModeValue}</strong>
+          <p>{t.projectsList.metrics.backendModeBody}</p>
         </article>
         <article className="metric-card">
-          <span className="metric-card__label">Workflow</span>
-          <strong>Upload → Index → Query</strong>
-          <p>Use a project as the operating envelope for documents and analysis jobs.</p>
+          <span className="metric-card__label">{t.projectsList.metrics.workflowLabel}</span>
+          <strong>{t.projectsList.metrics.workflowValue}</strong>
+          <p>{t.projectsList.metrics.workflowBody}</p>
         </article>
       </section>
 
@@ -85,31 +85,33 @@ export function ProjectsListPage() {
         <section className="panel panel--glow">
           <div className="section-head">
             <div>
-              <span className="section-kicker">Create</span>
-              <h2>New Project</h2>
+              <span className="section-kicker">{t.projectsList.create.kicker}</span>
+              <h2>{t.projectsList.create.title}</h2>
             </div>
           </div>
           <form className="form-grid" onSubmit={handleCreateProject}>
             <label>
-              Name
+              {t.projectsList.create.name}
               <input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 maxLength={200}
-                placeholder="Corporate Governance Review"
+                placeholder={t.projectsList.create.namePlaceholder}
               />
             </label>
             <label>
-              Description
+              {t.projectsList.create.description}
               <textarea
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 maxLength={2000}
-                placeholder="What this workspace is for, what domain it covers, and what the retrieval assistant should keep in mind."
+                placeholder={t.projectsList.create.descriptionPlaceholder}
               />
             </label>
             <button type="submit" disabled={!canSubmit || createProjectMutation.isPending}>
-              {createProjectMutation.isPending ? "Creating project..." : "Create project"}
+              {createProjectMutation.isPending
+                ? t.projectsList.create.creating
+                : t.projectsList.create.submit}
             </button>
           </form>
           {createError && <p className="error">{createError}</p>}
@@ -118,17 +120,17 @@ export function ProjectsListPage() {
         <section className="panel panel--stack">
           <div className="section-head">
             <div>
-              <span className="section-kicker">Active workspaces</span>
-              <h2>Projects</h2>
+              <span className="section-kicker">{t.projectsList.list.kicker}</span>
+              <h2>{t.projectsList.list.title}</h2>
             </div>
-            <span className="pill">{data?.items.length ?? 0} visible</span>
+            <span className="pill">{t.projectsList.list.visible(data?.items.length ?? 0)}</span>
           </div>
-          {isLoading && <p className="muted">Loading projects...</p>}
+          {isLoading && <p className="muted">{t.projectsList.list.loading}</p>}
           {listError && <p className="error">{listError}</p>}
           {!isLoading && !isError && data && data.items.length === 0 && (
             <div className="empty-state">
-              <h3>No projects yet</h3>
-              <p>Create the first workspace to start uploading documents and running RAG.</p>
+              <h3>{t.projectsList.list.emptyTitle}</h3>
+              <p>{t.projectsList.list.emptyBody}</p>
             </div>
           )}
           {!isLoading && !isError && data && data.items.length > 0 && (
@@ -138,22 +140,26 @@ export function ProjectsListPage() {
                   <div className="entity-card__header">
                     <div>
                       <h3>{project.name}</h3>
-                      <p>{project.description || "No description provided."}</p>
+                      {project.description ? (
+                        <MarkdownContent content={project.description} />
+                      ) : (
+                        <p>{t.projectsList.list.noDescription}</p>
+                      )}
                     </div>
                     <span className="pill">#{project.id}</span>
                   </div>
                   <div className="entity-meta entity-meta-wrap">
-                    <span>{project.document_count} documents</span>
-                    <span>Updated {new Date(project.updated_at).toLocaleString()}</span>
+                    <span>{t.shared.counts.documents(project.document_count)}</span>
+                    <span>{t.shared.updatedAt(project.updated_at)}</span>
                   </div>
                   <div className="inline-actions">
-                    <Link to={`/projects/${project.id}`}>Open workspace</Link>
+                    <Link to={`/projects/${project.id}`}>{t.projectsList.list.open}</Link>
                     <button
                       type="button"
                       className="btn-danger"
                       onClick={() => handleDeleteProject(project.id)}
                     >
-                      Delete
+                      {t.shared.delete}
                     </button>
                   </div>
                 </li>

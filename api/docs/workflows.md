@@ -9,12 +9,14 @@
 5. The API enqueues a `documents.document_processing_jobs` row with status `queued`.
 6. The API returns `201` immediately.
 7. The worker claims the queued job with PostgreSQL row locking.
-8. The worker parses the file through Docling, creates chunks, generates embeddings through TEI, writes chunk and embedding rows, and marks the document `indexed`.
+8. The worker parses the file through Docling, creates chunks, inserts chunk rows, sends TEI embedding batches with bounded per-document concurrency, writes embedding rows transactionally, and marks the document `indexed`.
 9. On failure, the worker marks the job `failed` and the document `failed`.
+
+The exact chunking, TEI batching, and vector-persistence path is documented in [embedding-pipeline.md](./embedding-pipeline.md).
 
 For provider-backed parsing today:
 
-- `application/pdf` and `application/vnd.openxmlformats-officedocument.wordprocessingml.document` are sent to Docling for text extraction
+- `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, and `text/html` are sent to Docling for text extraction
 - `text/plain` and `text/markdown` are ingested directly without Docling
 - legacy `.doc` is not part of the supported MVP parsing contract
 
@@ -35,6 +37,8 @@ For provider-backed parsing today:
 11. The service builds the answer prompt from project context, the original question, the rewritten query, and selected retrieved chunks using `prompts/rag_response.txt`.
 12. The API returns the answer plus citations.
 
+The exact query embedding and pgvector retrieval path is documented in [embedding-pipeline.md](./embedding-pipeline.md).
+
 ## Contradiction Analysis
 
 1. The API receives `POST /projects/{projectId}/analysis/contradictions`.
@@ -45,12 +49,13 @@ For provider-backed parsing today:
 6. The API inserts relational target rows into `analysis.analysis_job_targets`.
 7. The API returns `202` with the job polling URL.
 8. The worker claims the queued job and loads project prompt context.
-9. For each base chunk, the worker retrieves up to `CONTRADICTION_TOP_K_PER_BASE_CHUNK` nearest target chunks.
-10. Candidate pairs beyond `CONTRADICTION_MAX_DISTANCE` are discarded.
-11. The worker evaluates at most `CONTRADICTION_MAX_PAIRS_PER_JOB` candidate pairs through the LLM using `prompts/contradiction_discovery.txt`.
-12. For each target document with detected contradictions, the worker builds a document-level summary using `prompts/contradiction_summary.txt`.
-13. The worker stores the final ranked contradiction payload as `jsonb`.
-14. The worker marks the job `completed` or `failed`.
+9. The worker retrieves contradiction candidates for target documents concurrently, with each base chunk contributing up to `CONTRADICTION_TOP_K_PER_BASE_CHUNK` nearest target chunks.
+10. Candidate pairs beyond `CONTRADICTION_MAX_DISTANCE` are discarded, and each target contributes at most `CONTRADICTION_MAX_CANDIDATES_PER_TARGET` filtered pairs into the global pool.
+11. The worker merges all target pools, sorts the combined candidates globally by distance, deduplicates by `(target document, base chunk order)`, and keeps at most `CONTRADICTION_MAX_PAIRS_PER_JOB` candidates for LLM evaluation.
+12. The worker evaluates the selected candidate pairs through the LLM with bounded concurrency using `prompts/contradiction_discovery.txt`.
+13. For each target document with detected contradictions, the worker builds a document-level summary using `prompts/contradiction_summary.txt`, using the same bounded LLM concurrency budget.
+14. The worker stores the final ranked contradiction payload as `jsonb`.
+15. The worker marks the job `completed` or `failed`.
 
 ## Project Reindex
 

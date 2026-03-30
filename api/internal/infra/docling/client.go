@@ -284,6 +284,8 @@ func inferSourceFormat(filename, mimeType string) string {
 		return "pdf"
 	case strings.HasSuffix(lowerName, ".docx"), mimeType == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
 		return "docx"
+	case strings.HasSuffix(lowerName, ".html"), strings.HasSuffix(lowerName, ".htm"), mimeType == "text/html":
+		return "html"
 	case strings.HasSuffix(lowerName, ".md"), mimeType == "text/markdown":
 		return "md"
 	default:

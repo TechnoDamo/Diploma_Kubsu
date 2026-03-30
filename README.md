@@ -86,7 +86,7 @@ Docling Serve allows us to reliably transform real-world documents into clean, s
 
 ## [Embedding & Indexing Service](./embedding_service/)
 
-gRPC server for embeddings creation.
+Embedding generation is served over HTTP via Hugging Face TEI. The backend creates document chunk embeddings asynchronously in the worker during indexing, and creates query embeddings synchronously during RAG retrieval.
 
 ## Knowledge Database
 

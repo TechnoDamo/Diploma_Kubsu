@@ -88,8 +88,12 @@ This directory must be persistent in any deployment where document content must 
   Base URL for the document parsing service.
 - `TEI_BASE_URL`
   Base URL for the text-embeddings-inference service.
+- `TEI_HTTP_TIMEOUT`
+  Maximum time the backend waits for a single TEI embedding response before failing the batch.
 - `TEI_EMBED_BATCH_SIZE`
   Number of chunk texts sent in a single TEI embedding request during indexing.
+- `MAX_EMBEDDING_CONCURRENT_REQUESTS`
+  Maximum number of TEI embedding batch requests a single document-indexing job may keep in flight.
 - `LLM_PROVIDER`
   Logical provider label used for logs and future routing decisions.
 - `LLM_API_TYPE`
@@ -116,8 +120,14 @@ This directory must be persistent in any deployment where document content must 
   Maximum allowed embedding distance for a candidate pair to be sent to the LLM.
 - `CONTRADICTION_TOP_K_PER_BASE_CHUNK`
   Number of nearest target chunks collected per base chunk before distance filtering.
+- `CONTRADICTION_MAX_CANDIDATES_PER_TARGET`
+  Maximum number of filtered candidate pairs retained per target document before the global merge and sort step.
 - `CONTRADICTION_MAX_PAIRS_PER_JOB`
   Hard upper bound on LLM pair evaluations for a single contradiction-analysis job.
+- `MAX_CONTRADICTION_RETRIEVAL_CONCURRENT_TARGETS`
+  Maximum number of target-document retrieval passes a single contradiction-analysis job may run concurrently.
+- `MAX_CONTRADICTION_LLM_CONCURRENT_REQUESTS`
+  Maximum number of contradiction-analysis LLM requests in flight for pair judgement and summary generation.
 
 ## Project-Level Runtime Overrides
 

@@ -66,7 +66,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("build llm client: %w", err)
 	}
 
-	teiClient := tei.New(cfg.TEI.BaseURL)
+	teiClient := tei.New(cfg.TEI.BaseURL, cfg.TEIHTTPTimeout)
 	if cfg.DependencyStartupChecksEnabled {
 		checkCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 		defer cancel()
@@ -102,9 +102,9 @@ func NewWithModules(ctx context.Context, cfg config.Config) (*App, error) {
 
 	application.Projects = projects.NewService(application.DB, cfg.ProjectIndexDefaults)
 	application.Documents = documents.NewService(application.DB, application.Files, cfg)
-	application.RAG = rag.NewService(application.DB, application.TEI, application.LLM, application.Prompts, cfg)
-	application.Analysis = analysis.NewService(application.DB, application.LLM, application.Prompts, cfg)
-	application.Indexing = indexing.NewService(application.DB, application.Files, application.Docling, application.TEI, cfg)
+	application.RAG = rag.NewService(application.DB, application.TEI, application.LLM, application.Prompts, cfg, application.Logger)
+	application.Analysis = analysis.NewService(application.DB, application.LLM, application.Prompts, cfg, application.Logger)
+	application.Indexing = indexing.NewService(application.DB, application.Files, application.Docling, application.TEI, cfg, application.Logger)
 
 	return application, nil
 }

@@ -156,6 +156,12 @@ npm run preview
   - default: `false`
   - when `true`, the browser starts MSW before rendering the app
 
+- `VITE_UPLOAD_MAX_SIZE_BYTES`
+
+  - default: `26214400`
+  - frontend display value for the upload size limit shown in the document upload form
+  - should match backend `HTTP_MAX_UPLOAD_SIZE_BYTES`
+
 Example:
 
 ```bash

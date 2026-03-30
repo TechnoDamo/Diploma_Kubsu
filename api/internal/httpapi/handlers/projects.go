@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-playground/validator/v10"
 
 	"mimir/api/internal/modules/projects"
@@ -41,6 +42,7 @@ func (h Handler) ListProjects(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.app.Projects.List(r.Context(), page, limit)
 	if err != nil {
+		h.logInternalError(r, "list projects", err, "page", page, "limit", limit)
 		respondError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Unexpected internal server error.")
 		return
 	}
@@ -86,10 +88,18 @@ func (h Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, projects.ErrProjectAlreadyExists):
 			respondError(w, http.StatusConflict, "PROJECT_ALREADY_EXISTS", "Project with the same name already exists.")
 		default:
+			h.logInternalError(r, "create project", err, "name", req.Name)
 			respondError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Unexpected internal server error.")
 		}
 		return
 	}
+
+	h.app.Logger.Info(
+		"project created via http",
+		"request_id", middleware.GetReqID(r.Context()),
+		"project_id", project.ID,
+		"name", project.Name,
+	)
 
 	respondJSON(w, http.StatusCreated, mapProjectResponse(project))
 }
@@ -107,6 +117,7 @@ func (h Handler) GetProject(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, projects.ErrProjectNotFound):
 			respondError(w, http.StatusNotFound, "PROJECT_NOT_FOUND", "Project does not exist.")
 		default:
+			h.logInternalError(r, "get project", err, "project_id", projectID)
 			respondError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Unexpected internal server error.")
 		}
 		return
@@ -130,6 +141,7 @@ func (h Handler) DeleteProject(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, projects.ErrProjectBusy):
 			respondError(w, http.StatusConflict, "PROJECT_HAS_ACTIVE_JOBS", "Project cannot be deleted while active jobs are running.")
 		default:
+			h.logInternalError(r, "delete project", err, "project_id", projectID)
 			respondError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Unexpected internal server error.")
 		}
 		return

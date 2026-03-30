@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"mimir/api/internal/modules/analysis"
 )
 
@@ -76,10 +77,19 @@ func (h Handler) StartContradictionAnalysis(w http.ResponseWriter, r *http.Reque
 		case errors.Is(err, analysis.ErrLLMUnavailable):
 			respondError(w, http.StatusServiceUnavailable, "LLM_DEPENDENCY_UNAVAILABLE", "LLM service is unavailable.")
 		default:
+			h.logInternalError(r, "start contradiction analysis", err, "project_id", projectID, "base_document_id", req.BaseDocumentID, "target_document_count", len(req.TargetDocumentIDs))
 			respondError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Unexpected internal server error.")
 		}
 		return
 	}
+
+	h.app.Logger.Info(
+		"analysis job accepted via http",
+		"request_id", middleware.GetReqID(r.Context()),
+		"project_id", projectID,
+		"job_id", job.JobID,
+		"base_document_id", req.BaseDocumentID,
+	)
 
 	w.Header().Set("Location", job.PollURL)
 	respondJSON(w, http.StatusAccepted, acceptedAnalysisResponse{
@@ -108,6 +118,7 @@ func (h Handler) GetContradictionAnalysis(w http.ResponseWriter, r *http.Request
 		case errors.Is(err, analysis.ErrJobNotFound):
 			respondError(w, http.StatusNotFound, "ANALYSIS_JOB_NOT_FOUND", "Analysis job does not exist in this project.")
 		default:
+			h.logInternalError(r, "get contradiction analysis", err, "project_id", projectID, "job_id", jobID)
 			respondError(w, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Unexpected internal server error.")
 		}
 		return

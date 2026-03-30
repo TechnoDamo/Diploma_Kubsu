@@ -1,81 +1,74 @@
 # Embedding Service
 
-Use Hugging Face `text-embeddings-inference` as the embedding server. No local worker service is needed for deployment.
+This repository uses Hugging Face Text Embeddings Inference (TEI) as the embedding runtime.
 
-## Quick Start
+The backend integration is HTTP-based, not gRPC-based. The Go backend calls `POST /embed` and expects one embedding per input string. That contract is implemented in `api/internal/infra/tei/client.go`.
+
+## Runtime Contract
+
+The backend sends requests like:
+
+```json
+{
+  "inputs": ["Hello world"],
+  "dimensions": 1024
+}
+```
+
+The backend currently uses TEI for two paths:
+
+- indexing-time document chunk embeddings
+- query-time RAG retrieval embeddings
+
+The configured dimension must match the actual output size of the served model.
+
+## Local CPU Test
 
 ```bash
 model=Qwen/Qwen3-Embedding-0.6B
-volume=$PWD/data
-
-docker run --gpus all -p 8080:80 \
-  -v $volume:/data \
-  --pull always \
-  ghcr.io/huggingface/text-embeddings-inference:cuda-1.9-grpc \
-  --model-id $model
+text-embeddings-router --model-id "$model" --port 8080
 ```
 
-This starts the embeddings server in Docker and stores downloaded model files in [`embedding_service/data`](/Users/damir/Documents/Diploma_Kubsu/embedding_service/data) via the `/data` volume.
-
-## Parameters
-
-- `model`: Hugging Face embedding model id
-- `volume`: local cache directory for model weights
-- `--gpus all`: enable GPU inference
-- `-p 8080:80`: expose the container on `localhost:8080`
-- `cuda-1.9-grpc`: TEI image with gRPC enabled
-
-## CPU Version
-
-If GPU is not available, use a CPU image:
+Example request:
 
 ```bash
-model=Qwen/Qwen3-Embedding-0.6B
-volume=$PWD/data
-
-docker run -p 8080:80 \
-  -v $volume:/data \
-  --pull always \
-  ghcr.io/huggingface/text-embeddings-inference:cpu-1.9-grpc \
-  --model-id $model
+curl http://localhost:8080/embed \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inputs": ["Hello world"],
+    "dimensions": 1024
+  }'
 ```
 
-## Why mount `/data`
+## GPU Deployment
 
-Mounting `/data` keeps the model cache between restarts:
-
-- first start downloads the model
-- next starts are faster
-
-## Suggested Models
-
-- `Qwen/Qwen3-Embedding-0.6B`
-- `BAAI/bge-small-en-v1.5`
-- `intfloat/multilingual-e5-base`
-- `ai-forever/ru-en-RoSBERTa`
-
-## Docker Compose Example
-
-```yaml
-services:
-  embeddings:
-    image: ghcr.io/huggingface/text-embeddings-inference:cuda-1.9-grpc
-    ports:
-      - "8080:80"
-    volumes:
-      - ./data:/data
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    command: ["--model-id", "Qwen/Qwen3-Embedding-0.6B"]
-```
-
-Run:
+CUDA-backed deployment is expected to run in a container.
 
 ```bash
-docker compose up
+model=Qwen/Qwen3-Embedding-8B
+volume=$PWD/data
+
+sudo docker run \
+  --gpus all \
+  -p 8080:80 \
+  -v "$volume:/data" \
+  --pull always \
+  ghcr.io/huggingface/text-embeddings-inference:cuda-1.9 \
+  --model-id "$model"
 ```
+
+Sharing a persistent `/data` volume avoids re-downloading weights every run.
+
+
+
+## Integration Notes
+
+- `TEI_BASE_URL` in the backend should point to this service
+- `PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION` must match the model output dimensionality
+- `PROJECT_INDEX_DEFAULTS_EMBEDDING_MODEL_NAME` must match a seeded row in `embeddings.embedding_models`
+
+## References
+
+- TEI docs: https://huggingface.co/docs/text-embeddings-inference/index
+- Embed endpoint reference: https://huggingface.github.io/text-embeddings-inference/#/Text%20Embeddings%20Inference/embed

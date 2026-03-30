@@ -151,6 +151,8 @@ Used for embeddings.
 
 The backend treats TEI as a stable embedding HTTP contract, while project-level config decides which model and dimensionality are active.
 
+The precise indexing-time and query-time embedding flow is documented in [embedding-pipeline.md](./embedding-pipeline.md).
+
 ### LLM Provider
 
 DeepSeek is the first configured provider, but the runtime dispatches by `LLM_API_TYPE` rather than by vendor name.

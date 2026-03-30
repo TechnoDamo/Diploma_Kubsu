@@ -32,13 +32,18 @@ type Config struct {
 
 	DependencyStartupChecksEnabled bool `env:"DEPENDENCY_STARTUP_CHECKS_ENABLED" env-default:"true"`
 
-	QueryRewriteDefaultEnabled    bool    `env:"QUERY_REWRITE_DEFAULT_ENABLED" env-default:"true"`
-	RAGRetrievalTopK              int     `env:"RAG_RETRIEVAL_TOP_K" env-default:"8"`
-	RAGContextTopN                int     `env:"RAG_CONTEXT_TOP_N" env-default:"4"`
-	ContradictionMaxDistance      float64 `env:"CONTRADICTION_MAX_DISTANCE" env-default:"0.35"`
-	ContradictionTopKPerBaseChunk int     `env:"CONTRADICTION_TOP_K_PER_BASE_CHUNK" env-default:"1"`
-	ContradictionMaxPairsPerJob   int     `env:"CONTRADICTION_MAX_PAIRS_PER_JOB" env-default:"50"`
-	TEIEmbedBatchSize             int     `env:"TEI_EMBED_BATCH_SIZE" env-default:"64"`
+	QueryRewriteDefaultEnabled              bool          `env:"QUERY_REWRITE_DEFAULT_ENABLED" env-default:"true"`
+	RAGRetrievalTopK                        int           `env:"RAG_RETRIEVAL_TOP_K" env-default:"8"`
+	RAGContextTopN                          int           `env:"RAG_CONTEXT_TOP_N" env-default:"4"`
+	ContradictionMaxDistance                float64       `env:"CONTRADICTION_MAX_DISTANCE" env-default:"0.35"`
+	ContradictionTopKPerBaseChunk           int           `env:"CONTRADICTION_TOP_K_PER_BASE_CHUNK" env-default:"1"`
+	ContradictionMaxCandidatesPerTarget     int           `env:"CONTRADICTION_MAX_CANDIDATES_PER_TARGET" env-default:"20"`
+	ContradictionMaxPairsPerJob             int           `env:"CONTRADICTION_MAX_PAIRS_PER_JOB" env-default:"50"`
+	ContradictionRetrievalConcurrentTargets int           `env:"MAX_CONTRADICTION_RETRIEVAL_CONCURRENT_TARGETS" env-default:"4"`
+	ContradictionLLMConcurrentRequests      int           `env:"MAX_CONTRADICTION_LLM_CONCURRENT_REQUESTS" env-default:"3"`
+	TEIEmbedBatchSize                       int           `env:"TEI_EMBED_BATCH_SIZE" env-default:"16"`
+	MaxEmbeddingConcurrentRequests          int           `env:"MAX_EMBEDDING_CONCURRENT_REQUESTS" env-default:"2"`
+	TEIHTTPTimeout                          time.Duration `env:"TEI_HTTP_TIMEOUT" env-default:"180s"`
 }
 
 type HTTPConfig struct {
@@ -46,7 +51,7 @@ type HTTPConfig struct {
 	Port               int           `env:"HTTP_PORT" env-default:"8080"`
 	PublicBaseURL      string        `env:"HTTP_PUBLIC_BASE_URL" env-default:"http://localhost:8080"`
 	ReadTimeout        time.Duration `env:"HTTP_READ_TIMEOUT" env-default:"15s"`
-	WriteTimeout       time.Duration `env:"HTTP_WRITE_TIMEOUT" env-default:"15s"`
+	WriteTimeout       time.Duration `env:"HTTP_WRITE_TIMEOUT" env-default:"90s"`
 	IdleTimeout        time.Duration `env:"HTTP_IDLE_TIMEOUT" env-default:"60s"`
 	MaxUploadSizeBytes int64         `env:"HTTP_MAX_UPLOAD_SIZE_BYTES" env-default:"26214400"`
 }

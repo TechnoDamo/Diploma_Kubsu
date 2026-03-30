@@ -1,9 +1,15 @@
 import { env } from "../config/env";
+import { t } from "../i18n";
 import type {
   ApiError,
   ErrorResponse,
   ValidationErrorResponse,
 } from "../types/api";
+
+function looksLikeHtml(value: string) {
+  const trimmed = value.trim();
+  return trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html") || trimmed.startsWith("<body");
+}
 
 function isValidationError(value: unknown): value is ValidationErrorResponse {
   if (!value || typeof value !== "object") {
@@ -52,7 +58,26 @@ function normalizeError(status: number, payload: unknown): ApiError {
     kind: "error",
     status,
     code: "UNKNOWN_ERROR",
-    message: "Unexpected error payload from API",
+    message: t.shared.unknownApiError,
+  };
+}
+
+function normalizeTextError(status: number, payload: string): ApiError {
+  const trimmed = payload.trim();
+  if (!trimmed || looksLikeHtml(trimmed)) {
+    return {
+      kind: "error",
+      status,
+      code: `HTTP_${status}`,
+      message: t.shared.unexpectedHttpError(status),
+    };
+  }
+
+  return {
+    kind: "error",
+    status,
+    code: `HTTP_${status}`,
+    message: trimmed,
   };
 }
 
@@ -102,8 +127,19 @@ async function requestCore<T>(
   });
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    throw normalizeError(response.status, payload);
+    const raw = await response.text();
+    if (!raw.trim()) {
+      throw normalizeError(response.status, {});
+    }
+
+    try {
+      throw normalizeError(response.status, JSON.parse(raw));
+    } catch (error) {
+      if (typeof error === "object" && error && "kind" in error) {
+        throw error;
+      }
+      throw normalizeTextError(response.status, raw);
+    }
   }
 
   return readResponse<T>(response, expected);

@@ -1,2 +1,5 @@
 .idea/
 embedding_service/data/
+.tools/
+api/.env
+api/var/
