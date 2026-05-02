@@ -1,0 +1,88 @@
+services:
+  mongodb:
+    profiles: ["local-graylog"]
+    image: mongo:6
+    container_name: mimir-graylog-mongodb
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_DATABASE=graylog
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - graylog
+
+  elasticsearch:
+    profiles: ["local-graylog"]
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.23
+    container_name: mimir-graylog-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - ./elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - graylog
+
+  graylog:
+    profiles: ["local-graylog"]
+    image: graylog/graylog:5.2
+    container_name: mimir-graylog
+    restart: unless-stopped
+    environment:
+      - GRAYLOG_HTTP_EXTERNAL_URI=http://localhost:19000/
+      - GRAYLOG_PASSWORD_SECRET=${GRAYLOG_PASSWORD_SECRET:-some16characterpwd}
+      - GRAYLOG_ROOT_PASSWORD_SHA2=${GRAYLOG_ROOT_PASSWORD_SHA2:-8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918}
+      - GRAYLOG_ROOT_TIMEZONE=UTC
+      - GRAYLOG_ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - GRAYLOG_MONGODB_URI=mongodb://mongodb:27017/graylog
+    ports:
+      - "19000:9000"
+      - "12201:12201"
+      - "12201:12201/udp"
+      - "1514:1514"
+      - "1514:1514/udp"
+      - "5555:5555"
+      - "5555:5555/udp"
+    volumes:
+      - graylog_data:/usr/share/graylog/data
+      - graylog_journal:/usr/share/graylog/journal
+    depends_on:
+      - mongodb
+      - elasticsearch
+    networks:
+      - graylog
+
+  graylog-init:
+    profiles: ["local-graylog"]
+    image: curlimages/curl:8.8.0
+    container_name: mimir-graylog-init
+    restart: "no"
+    entrypoint: ["/bin/sh", "/init/init-graylog.sh"]
+    environment:
+      - GRAYLOG_URL=http://graylog:9000
+      - GRAYLOG_USER=admin
+      - GRAYLOG_ADMIN_PASSWORD=${GRAYLOG_ADMIN_PASSWORD:-admin}
+      - GRAYLOG_INPUT_TITLE=${GRAYLOG_INPUT_TITLE:-Mimir Backend GELF TCP}
+      - GRAYLOG_INPUT_PORT=${GRAYLOG_INPUT_PORT:-12201}
+    volumes:
+      - ./init:/init:ro
+    depends_on:
+      - graylog
+    networks:
+      - graylog
+
+networks:
+  graylog:
+    name: mimir_graylog
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  graylog_data:
+  graylog_journal:

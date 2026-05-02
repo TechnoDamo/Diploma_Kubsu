@@ -1,5 +1,12 @@
 .idea/
-embedding_service/data/
 .tools/
+.claude/
+.DS_Store
+.env
+models/
 api/.env
 api/var/
+graylog/elasticsearch_data/
+graylog/mongodb_data/
+graylog/graylog_data/
+graylog/graylog_journal/
