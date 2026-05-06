@@ -2,87 +2,81 @@ services:
   mongodb:
     profiles: ["local-graylog"]
     image: mongo:6
-    container_name: mimir-graylog-mongodb
-    restart: unless-stopped
-    environment:
-      - MONGO_INITDB_DATABASE=graylog
+    container_name: graylog-mongodb
     volumes:
-      - mongodb_data:/data/db
+      - graylog_mongodb_data:/data/db
     networks:
       - graylog
 
   elasticsearch:
     profiles: ["local-graylog"]
     image: docker.elastic.co/elasticsearch/elasticsearch:7.17.23
-    container_name: mimir-graylog-elasticsearch
-    restart: unless-stopped
+    container_name: graylog-elasticsearch
     environment:
       - discovery.type=single-node
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       - xpack.security.enabled=false
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
     volumes:
-      - ./elasticsearch_data:/usr/share/elasticsearch/data
+      - graylog_es_data:/usr/share/elasticsearch/data
     networks:
       - graylog
 
   graylog:
     profiles: ["local-graylog"]
     image: graylog/graylog:5.2
-    container_name: mimir-graylog
-    restart: unless-stopped
+    container_name: graylog
     environment:
-      - GRAYLOG_HTTP_EXTERNAL_URI=http://localhost:19000/
-      - GRAYLOG_PASSWORD_SECRET=${GRAYLOG_PASSWORD_SECRET:-some16characterpwd}
-      - GRAYLOG_ROOT_PASSWORD_SHA2=${GRAYLOG_ROOT_PASSWORD_SHA2:-8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918}
-      - GRAYLOG_ROOT_TIMEZONE=UTC
-      - GRAYLOG_ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      - GRAYLOG_MONGODB_URI=mongodb://mongodb:27017/graylog
+      GRAYLOG_PASSWORD_SECRET: somepasswordpepper
+      GRAYLOG_ROOT_PASSWORD_SHA2: 8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+      GRAYLOG_HTTP_EXTERNAL_URI: http://127.0.0.1:19000/
+      GRAYLOG_ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      GRAYLOG_MONGODB_URI: mongodb://mongodb:27017/graylog
     ports:
-      - "19000:9000"
-      - "12201:12201"
-      - "12201:12201/udp"
-      - "1514:1514"
-      - "1514:1514/udp"
-      - "5555:5555"
-      - "5555:5555/udp"
-    volumes:
-      - graylog_data:/usr/share/graylog/data
-      - graylog_journal:/usr/share/graylog/journal
+      - "${GRAYLOG_UI_HOST_PORT:-19000}:9000"
+      - "${GRAYLOG_GELF_HOST_PORT:-12201}:12201/udp"
+      - "${GRAYLOG_SYSLOG_HOST_PORT:-1514}:1514"
+      - "${GRAYLOG_EXTRA_HOST_PORT:-5555}:5555"
     depends_on:
       - mongodb
       - elasticsearch
     networks:
       - graylog
+      - mimir
 
   graylog-init:
     profiles: ["local-graylog"]
     image: curlimages/curl:8.8.0
     container_name: mimir-graylog-init
-    restart: "no"
-    entrypoint: ["/bin/sh", "/init/init-graylog.sh"]
-    environment:
-      - GRAYLOG_URL=http://graylog:9000
-      - GRAYLOG_USER=admin
-      - GRAYLOG_ADMIN_PASSWORD=${GRAYLOG_ADMIN_PASSWORD:-admin}
-      - GRAYLOG_INPUT_TITLE=${GRAYLOG_INPUT_TITLE:-Mimir Backend GELF TCP}
-      - GRAYLOG_INPUT_PORT=${GRAYLOG_INPUT_PORT:-12201}
-    volumes:
-      - ./init:/init:ro
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo "Waiting for Graylog..."
+        for i in $$(seq 60); do
+          if curl -s http://graylog:9000/api/system/lbstatus -u admin:admin >/dev/null 2>&1; then
+            echo "Graylog ready"
+            break
+          fi
+          sleep 5
+        done
+        echo "Creating GELF TCP input..."
+        curl -s -X POST http://graylog:9000/api/system/inputs \
+          -u admin:admin \
+          -H "Content-Type: application/json" \
+          -H "X-Requested-By: cli" \
+          -d '{"title":"GELF TCP","type":"org.graylog2.inputs.gelf.tcp.GELFTCPInput","configuration":{"bind_address":"0.0.0.0","port":12201,"recv_buffer_size":1048576},"global":true}' || true
+        echo "Graylog init completed"
     depends_on:
       - graylog
-    networks:
-      - graylog
+    restart: "no"
+
+volumes:
+  graylog_mongodb_data:
+  graylog_es_data:
 
 networks:
   graylog:
-    name: mimir_graylog
     driver: bridge
-
-volumes:
-  mongodb_data:
-  graylog_data:
-  graylog_journal:
+  mimir:
+    name: mimir
+    driver: bridge

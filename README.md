@@ -1,127 +1,212 @@
-# 🧠 Mimir — Intelligent RAG System with Cross-Document Analysis
+# Mimir — Интеллектуальная RAG-система с кросс-документным анализом
 
-> A Retrieval-Augmented Generation platform for building document knowledge bases with a core focus on **simultaneous multi-document comparison** and **automatic contradiction discovery**.
-
----
-
-# Table of Contents
-
-- [Project Overview](#project-overview)
-- [Key Features](#key-features)
-- [Use Cases](#use-cases)
-- [High-level Architecture](#high-level-architecture)
-- [System Workflow](#system-workflow)
-- [Comparison & Contradiction Engine](#comparison--contradiction-engine)
-- [Database Design](#database-design)
-- [Core Components](#core-components)
-- [API Design](#api-design)
-- [Data Model](#data-model)
-- [Technology Stack](#technology-stack)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Running the System](#running-the-system)
-- [Example Flows](#example-flows)
-- [Scalability & Performance](#scalability--performance)
-- [Security Considerations](#security-considerations)
-- [Limitations](#limitations)
+> Платформа retrieval-augmented generation для построения баз знаний документов
+> с фокусом на **автоматическое обнаружение противоречий** и **семантическое сравнение**.
 
 ---
 
-# Project Overview
+## Обзор проекта
 
-This project is basically a RAG system for semantic storage of knowledge bases. It provides functionality of adding, vieweing and removing files (PDF, DOCX, TXT) from the system (knowledge base). Once files are added, you can ask the system various question about the content of the whole knowledge base. You can also search for contradictions between contents of any given file and any group of other files (including the entire knowledge base).
+Mimir — это RAG-система для семантического хранения и анализа документов.
+Позволяет загружать, просматривать и удалять файлы (PDF, DOCX, TXT, HTML, MD),
+задавать вопросы на естественном языке по содержимому всей базы знаний,
+а также находить **противоречия между документами** с помощью
+гибридного семантического поиска и LLM-анализа.
 
-# Key Features
+## Ключевые возможности
 
-- Adding, removing, and viewing documents in a centralized knowledge base  
-- Asking natural-language questions about the knowledge base and receiving valid answers and explanations  
-- Semantic cross-document comparison with automatic contradiction and inconsistency discovery  
+- Загрузка, удаление и просмотр документов в централизованной базе знаний
+- Вопросы на естественном языке с получением обоснованных ответов со ссылками на источники
+- Автоматическое обнаружение противоречий и несоответствий между документами
+- Гибридный поиск (dense + sparse) с раздельными настройками для RAG и анализа противоречий
+- Гибкое развёртывание: локальный AI на GPU или облачные API
 
-# Use Cases
+## Сценарии использования
 
-- **AI-Augmented Documentation Systems** <br>
-Build intelligent documentation portals where users can ask questions about internal knowledge and verify whether documents agree or conflict on specific topics.
+- **Проверка корпоративной базы знаний** — автоматическое обнаружение противоречий между политиками, регламентами и инструкциями
+- **Анализ научной литературы** — сравнение статей и отчётов для поиска конфликтующих утверждений
+- **Юридический анализ** — проверка договоров и нормативных документов на несоответствия
+- **Мониторинг регуляторных изменений** — отслеживание противоречий между новыми и существующими документами
 
-- **Enterprise Knowledge Base Validation** <br>
-Automatically detect contradictions between internal documents such as policies, technical standards, onboarding materials, and operational guidelines to maintain a consistent and reliable corporate knowledge base.
+---
 
-- **Scientific & Research Literature Analysis** <br>
-Compare research papers, reports, and experimental documentation to identify conflicting statements, incompatible assumptions, or evolving conclusions across large corpora.
+## Быстрый старт
 
-- **Legal & Compliance Document Review** <br>
-Analyze contracts, regulations, and internal compliance documents to discover logical conflicts, outdated clauses, and policy mismatches.
+```bash
+# Дефолтный запуск (LLM и embedding — cloud, остальное локально, Graylog — on)
+make up
 
-- **Regulatory Monitoring & Policy Tracking** <br>
-Continuously compare new documents against an existing knowledge base to detect when new regulations or updates contradict established rules or prior versions.
+# Полностью локальный AI с GPU
+make up LLM=local EMBEDDING=local
 
- 
+# Всё в облаке
+make up DOCLING=cloud POSTGRES=cloud QDRANT=cloud OBJECT_STORAGE=cloud
 
-# High-level Architecture
+# Без Graylog
+make up GRAYLOG=false
 
-Here is the high-level design schema.
+# Остановка
+make down
+```
 
-!['high level design'](./design.png)
+Приложение доступно на `http://localhost:3001`, API на `http://localhost:8080`, Graylog на `http://localhost:19000` (логин: admin/admin).
 
-# System Workflow
+---
 
-!['uml sequence'](./uml_sequence.png)
+## Флаги развёртывания
 
+| Флаг | По умолчанию | Значения | Назначение |
+|------|-------------|----------|-----------|
+| `LLM` | `cloud` | `local`, `cloud` | vLLM на GPU или DeepSeek API |
+| `EMBEDDING` | `cloud` | `local`, `cloud` | TEI на GPU или RouterAI API |
+| `DOCLING` | `local` | `local`, `cloud` | Docling Serve локально или удалённо |
+| `POSTGRES` | `local` | `local`, `cloud` | PostgreSQL локально или удалённо |
+| `QDRANT` | `local` | `local`, `cloud` | Qdrant локально или удалённо |
+| `OBJECT_STORAGE` | `filesystem` | `filesystem`, `local`, `cloud` | Локальная папка, MinIO или S3 |
+| `GRAYLOG` | `local` | `local`, `false` | Централизованное логирование |
 
-# Comparison & Contradiction Engine 
+---
 
+## Архитектура
 
-# Database Design
+```
+[React/TypeScript фронтенд]
+        │ HTTP REST
+        ▼
+[FastAPI бэкенд]  ←→  [Воркер (фоновые задачи)]
+   │       │               │         │
+   ▼       ▼               ▼         ▼
+[PostgreSQL] [Qdrant]   [TEI]   [vLLM/DeepSeek]
+   │          │           │          │
+   │          ▼           ▼          ▼
+   │    [dense+sparse] [embeddings] [LLM]
+   │
+   ▼
+[Docling] → парсинг PDF/DOCX/HTML → текст
+```
 
-!['database schema'](./knowledge_db/ERD.png)
+- **PostgreSQL** — источник истины: проекты, документы, чанки, задания
+- **Qdrant** — векторная БД: dense + sparse векторы для гибридного поиска
+- **TEI** — эмбеддинги (Hugging Face Text Embeddings Inference)
+- **vLLM / DeepSeek** — генерация ответов и анализ противоречий
+- **Docling** — парсинг документов в текст
+- **MinIO** — опциональное S3-совместимое объектное хранилище
+- **Graylog** — централизованное логирование (включено по умолчанию)
 
-# Core Components
+---
 
-## API Gateway
+## Гибридный поиск
 
-## [Document Ingestion / Parsing Service](./document_parsing_service/)
+Два независимых пайплайна с раздельными весами:
 
-This service is responsible for accepting raw document files (PDF, DOCX, TXT, etc.) and extracting their textual and structural content. <br>
-We use [Docling Serve](https://github.com/docling-project/docling-serve) as the ingestion backend. It provides an HTTP API on top of [Docling](https://github.com/docling-project/docling), a modern Python library for high-quality document parsing and structured text extraction. <br>
-Docling Serve allows us to reliably transform real-world documents into clean, structured text representations that can be directly used by downstream components for chunking, embedding, retrieval, and contradiction analysis.
+| Параметр | RAG (поиск информации) | Противоречия |
+|----------|----------------------|-------------|
+| `DENSE_WEIGHT` | 0.7 | 0.5 |
+| `SPARSE_WEIGHT` | 0.3 | 0.5 |
+| `TOP_K` | 5 | 5 |
 
-## [Embedding & Indexing Service](./embedding_service/)
+Dense-векторы — через TEI/embedding API (sentence embeddings).
+Sparse-векторы — через BM25/Qdrant tokenizer (ключевые слова).
+Все веса настраиваются через `.env`.
 
-Embedding generation is served over HTTP via Hugging Face TEI. The backend creates document chunk embeddings asynchronously in the worker during indexing, and creates query embeddings synchronously during RAG retrieval.
+---
 
-## Knowledge Database
+## Структура проекта
 
-## Comparison Engine
+```
+mimir/
+├── docker-compose.yml       # корневой compose (include: все сервисы)
+├── Makefile                 # up/down + флаги деплоя
+├── .env.example             # 120+ строк с комментариями на русском
+├── README.md
+│
+├── api/                     # Python/FastAPI бэкенд
+│   ├── app/                 # исходный код (routers, services, models, infra, worker)
+│   ├── prompts/             # 4 промпта на русском
+│   ├── pyproject.toml       # uv-зависимости
+│   ├── Dockerfile
+│   ├── docker-compose.yaml
+│   └── Makefile
+│
+├── frontend/                # React/TypeScript SPA
+│
+├── embedding/               # TEI сервис (GPU/CPU)
+├── llm/                     # vLLM сервис (GPU)
+├── document_parsing_service/ # Docling парсинг
+├── knowledge_db/            # PostgreSQL + миграции
+├── qdrant/                  # Qdrant векторная БД
+├── minio/                   # S3-совместимое хранилище
+├── graylog/                 # Логирование
+├── models/                  # Кеш HF-моделей
+├── scripts/                 # Утилиты (download_hf_model, setup-ai)
+└── test_docs/               # Тестовые документы
+```
 
-## LLM Orchestrator
+---
 
+## Конфигурация
 
-## Async Task Processor
+Все параметры задаются в `.env`. Пример в `.env.example`. Ключевые секции:
 
-## Client Applications
+- **LLM** — `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` (по умолчанию DeepSeek)
+- **Embedding** — `EMBEDDING_BASE_URL`, `EMBEDDING_API_KEY`, `EMBEDDING_MODEL` (по умолчанию RouterAI)
+- **Qdrant** — `QDRANT_URL`, `QDRANT_COLLECTION_NAME`
+- **Гибридный поиск** — `RAG_DENSE_WEIGHT`, `RAG_SPARSE_WEIGHT`, `CONTRADICTION_DENSE_WEIGHT`, `CONTRADICTION_SPARSE_WEIGHT`
+- **Sparse** — `SPARSE_VECTOR_ENABLED`, `SPARSE_MODEL`
+- **Парсинг документов** — `USE_DOCLING=true` (Docling) или `false` (PyPDF2)
+- **Загрузка файлов** — `UPLOAD_MAX_SIZE_MB` (по умолчанию 25 МБ)
+- **Порты** — `APP_PORT`, `FRONTEND_HOST_PORT`, `QDRANT_PORT`, `DOCLING_PORT`, `GRAYLOG_UI_HOST_PORT` и др.
 
-# API Design
+---
 
-# Data Model
+## API эндпоинты
 
-# Technology Stack
+| Метод | Путь | Описание |
+|-------|------|----------|
+| `GET` | `/healthz` | Проверка здоровья |
+| `GET` | `/api/v1/projects` | Список проектов |
+| `POST` | `/api/v1/projects` | Создать проект |
+| `GET` | `/api/v1/projects/{id}` | Детали проекта |
+| `DELETE` | `/api/v1/projects/{id}` | Удалить проект |
+| `GET` | `/api/v1/projects/{pid}/documents` | Список документов |
+| `POST` | `/api/v1/projects/{pid}/documents` | Загрузить документ |
+| `GET` | `/api/v1/projects/{pid}/documents/{did}` | Детали документа |
+| `DELETE` | `/api/v1/projects/{pid}/documents/{did}` | Удалить документ |
+| `GET` | `/api/v1/projects/{pid}/documents/{did}/text` | Текст документа |
+| `GET` | `/api/v1/projects/{pid}/documents/{did}/content` | Скачать оригинал |
+| `POST` | `/api/v1/projects/{pid}/rag/query` | RAG-запрос |
+| `POST` | `/api/v1/projects/{pid}/analysis/contradictions` | Запустить анализ противоречий |
+| `GET` | `/api/v1/projects/{pid}/analysis/contradictions/{jid}` | Статус анализа |
 
-# Installation
+---
 
-# Configuration
+## Схема базы данных
 
+![DB schema](knowledge_db/ERD.png)
 
-# Running the System
+- **documents.projects** — проекты (базы знаний) с состоянием
+- **documents.project_index_configs** — конфигурации индексации (модель, размер чанка, веса)
+- **documents.documents** — загруженные файлы с жизненным циклом
+- **documents.chunks** — текстовые чанки с привязкой к точкам Qdrant (`qdrant_point_id`)
+- **documents.document_processing_jobs** — очередь заданий индексации
+- **documents.document_history** — аудит операций над документами
+- **analysis.analysis_jobs** — задания анализа противоречий (результаты в JSONB)
+- **analysis.analysis_job_targets** — целевые документы для анализа
 
-# Example Flows
+---
 
-## Upload and Index Documents
+## Технологический стек
 
-## Run Cross-Document Comparison
-
-## Query the Knowledge Base
-
-# Scalability & Performance
-
-# Security Considerations
-
-# Limitations
+| Компонент | Технология |
+|-----------|-----------|
+| Бэкенд | Python 3.12, FastAPI, Uvicorn |
+| БД | PostgreSQL 16 |
+| Векторная БД | Qdrant (гибридный dense+sparse поиск) |
+| Парсинг документов | Docling Serve |
+| Эмбеддинги | TEI / OpenAI-compatible API |
+| LLM | DeepSeek / OpenAI-compatible API |
+| Фронтенд | React 18, TypeScript, Vite 6, TanStack Query |
+| Инфраструктура | Docker Compose |
+| Миграции | Goose |
+| Пакетный менеджер | uv (Python), npm (Frontend) |
+| Логирование | structlog + Graylog |

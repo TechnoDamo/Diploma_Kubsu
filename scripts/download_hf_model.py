@@ -1,50 +1,35 @@
-#!/usr/bin/env python3
-"""Скачивает snapshot HuggingFace-модели в локальную папку по заданному алиасу."""
-
-from __future__ import annotations
-
 import argparse
 import os
-import shutil
-from pathlib import Path
-
-from huggingface_hub import snapshot_download
+import sys
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--repo-id", required=True, help="HuggingFace repo id")
-    parser.add_argument("--local-dir", required=True, help="Локальная директория назначения")
-    parser.add_argument("--endpoint", default="https://huggingface.co", help="Базовый URL HF или зеркала")
-    parser.add_argument("--token", default=None, help="Токен HF для приватных репозиториев")
-    parser.add_argument("--revision", default=None, help="Опциональная ревизия/ветка/тег")
-    parser.add_argument("--clean", action="store_true", help="Удалить целевую папку перед загрузкой")
-    return parser.parse_args()
+def main():
+    parser = argparse.ArgumentParser(description="Download Hugging Face model")
+    parser.add_argument("--repo-id", required=True, help="HF repo ID (e.g. Qwen/Qwen2.5-0.5B-Instruct)")
+    parser.add_argument("--local-dir", required=True, help="Local directory to save model")
+    parser.add_argument("--token", default=os.environ.get("HUGGING_FACE_HUB_TOKEN", ""), help="HF token")
+    parser.add_argument("--endpoint", default=os.environ.get("HF_ENDPOINT", "https://huggingface.co"), help="HF endpoint")
+    args = parser.parse_args()
 
+    os.environ["HF_HUB_DISABLE_XET"] = "1"
+    os.environ["HF_ENDPOINT"] = args.endpoint
 
-def main() -> int:
-    args = parse_args()
-    local_dir = Path(args.local_dir).resolve()
-    if args.clean and local_dir.exists():
-        shutil.rmtree(local_dir)
-    local_dir.mkdir(parents=True, exist_ok=True)
+    if args.token:
+        os.environ["HUGGING_FACE_HUB_TOKEN"] = args.token
 
-    os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+    from huggingface_hub import snapshot_download
+
+    os.makedirs(args.local_dir, exist_ok=True)
+    print(f"Downloading {args.repo_id} to {args.local_dir}...")
 
     snapshot_download(
         repo_id=args.repo_id,
-        local_dir=str(local_dir),
-        endpoint=args.endpoint,
-        token=args.token or None,
-        revision=args.revision or None,
+        local_dir=args.local_dir,
         local_dir_use_symlinks=False,
-        force_download=True,
+        resume_download=True,
     )
-
-    print(f"Модель скачана: {args.repo_id}")
-    print(f"Локальная папка: {local_dir}")
-    return 0
+    print("Download complete")
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

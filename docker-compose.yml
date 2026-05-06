@@ -1,10 +1,10 @@
 include:
-  - ./postgres/docker-compose.yml
+  - ./knowledge_db/docker-compose.yaml
   - ./qdrant/docker-compose.yml
-  - ./minio/docker-compose.yml
   - ./embedding/docker-compose.yml
   - ./llm/docker-compose.yml
   - ./document_parsing_service/docker-compose.yml
-  - ./graylog/docker-compose.yml
+  - ./minio/docker-compose.yml
   - ./api/docker-compose.yaml
   - ./frontend/docker-compose.yml
+  - ./graylog/docker-compose.yml

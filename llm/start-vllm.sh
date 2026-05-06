@@ -1,28 +1,23 @@
-#!/bin/sh
+#!/bin/bash
+set -euo pipefail
 
-set -eu
+MODEL_PATH="/models/${LLM_HF_REPO:-Qwen/Qwen2.5-0.5B-Instruct}"
 
-model_alias="${LLM_MODEL_LOCAL:-qwen2.5-0.5b-instruct}"
-model_path="/models/${model_alias}"
-max_model_len="${LLM_CTX_SIZE:-2048}"
-dtype="${LLM_DTYPE:-bfloat16}"
-
-if [ ! -e /dev/nvidiactl ] && [ ! -e /dev/nvidia0 ]; then
-  echo "Ошибка: NVIDIA GPU не обнаружен. Деплой поддерживает только CUDA." >&2
-  exit 1
+if [ -f "/dev/nvidiactl" ] || [ -f "/dev/nvidia0" ]; then
+    echo "NVIDIA GPU detected"
+else
+    echo "No GPU found, running on CPU"
 fi
 
-if [ ! -f "${model_path}/config.json" ]; then
-  echo "Ошибка: модель не найдена по пути ${model_path}." >&2
-  echo "Выполните: make -C llm download-model" >&2
-  exit 1
+if [ ! -f "${MODEL_PATH}/config.json" ]; then
+    echo "Model not found at ${MODEL_PATH}"
+    echo "Run 'make download-model' first"
+    exit 1
 fi
 
-exec python3 -m vllm.entrypoints.openai.api_server \
-  --model "$model_path" \
-  --served-model-name "$model_alias" \
-  --host 0.0.0.0 \
-  --port 8080 \
-  --dtype "$dtype" \
-  --max-model-len "$max_model_len" \
-  --trust-remote-code
+python3 -m vllm.entrypoints.openai.api_server \
+    --model "${MODEL_PATH}" \
+    --host 0.0.0.0 \
+    --port 8080 \
+    --dtype "${LLM_DTYPE:-bfloat16}" \
+    --max-model-len "${LLM_CTX_SIZE:-2048}"

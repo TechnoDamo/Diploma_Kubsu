@@ -1,169 +1,160 @@
 services:
-  postgres-vector:
-    image: pgvector/pgvector:pg15
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: knowledge_base
-      POSTGRES_USER: knowledge_base_admin
-      POSTGRES_PASSWORD: pass123!
-      POSTGRES_INITDB_ARGS: --encoding=UTF8 --lc-collate=C --lc-ctype=C
-      TZ: UTC
-    ports:
-      - "5432:5432"
-    volumes:
-      - mimir_postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U knowledge_base_admin -d knowledge_base"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-
-  migrator:
-    build:
-      context: ../knowledge_db
-      dockerfile: Dockerfile.migrator
-    restart: "no"
-    depends_on:
-      postgres-vector:
-        condition: service_healthy
-    volumes:
-      - ../knowledge_db:/workspace:ro
-    working_dir: /workspace
-    command:
-      - -dir
-      - /workspace/migrations
-      - postgres
-      - host=postgres-vector port=5432 user=knowledge_base_admin password=pass123! dbname=knowledge_base sslmode=disable
-      - up
-
   api:
     build:
       context: .
-      target: runtime
+    container_name: mimir-api
     restart: unless-stopped
     depends_on:
-      postgres-vector:
+      postgres:
         condition: service_healthy
-      migrator:
-        condition: service_completed_successfully
+        required: false
+      qdrant:
+        condition: service_healthy
+        required: false
+    ports:
+      - "${APP_PORT:-8080}:8080"
     environment:
-      APP_ENV: container
-      LOG_LEVEL: INFO
-      ENABLE_LOCAL_FALLBACKS: "false"
-      DEPENDENCY_STARTUP_CHECKS_ENABLED: "true"
+      APP_ENV: ${APP_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       HTTP_HOST: 0.0.0.0
       HTTP_PORT: 8080
-      HTTP_PUBLIC_BASE_URL: http://localhost:8080
-      HTTP_READ_TIMEOUT: 15s
-      HTTP_WRITE_TIMEOUT: 15s
-      HTTP_IDLE_TIMEOUT: 60s
-      HTTP_MAX_UPLOAD_SIZE_BYTES: 26214400
-      POSTGRES_DSN: postgres://knowledge_base_admin:pass123!@postgres-vector:5432/knowledge_base?sslmode=disable
-      POSTGRES_MAX_CONNS: 10
-      POSTGRES_MIN_CONNS: 2
-      WORKER_POLL_INTERVAL: 3s
-      WORKER_BATCH_SIZE: 10
-      FILES_ROOT_DIR: /app/var/files
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-*}
+      POSTGRES_DSN: ${POSTGRES_DSN:-postgres://mimir:mimir@postgres:5432/mimir_db}
+      POSTGRES_MAX_CONNS: ${POSTGRES_MAX_CONNS:-10}
+      POSTGRES_MIN_CONNS: ${POSTGRES_MIN_CONNS:-2}
+      WORKER_POLL_INTERVAL: ${WORKER_POLL_INTERVAL_SECONDS:-3}
+      WORKER_BATCH_SIZE: ${WORKER_BATCH_SIZE:-10}
+      FILES_ROOT_DIR: /app/storage
       PROMPTS_DIR: /app/prompts
-      DOCLING_BASE_URL: http://docling:5001
-      TEI_BASE_URL: http://tei:8080
-      TEI_HTTP_TIMEOUT: 180s
-      TEI_EMBED_BATCH_SIZE: 16
-      MAX_EMBEDDING_CONCURRENT_REQUESTS: 2
-      LLM_PROVIDER: deepseek
-      LLM_API_TYPE: openai_compatible
-      LLM_PROVIDER_BASE_URL: http://llm-provider:8000
-      LLM_PROVIDER_API_KEY: ""
-      LLM_MODEL_NAME: deepseek-chat
-      PROJECT_INDEX_DEFAULTS_INGESTION_PIPELINE_ID: 1
-      PROJECT_INDEX_DEFAULTS_EMBEDDING_PIPELINE_ID: 1
-      PROJECT_INDEX_DEFAULTS_EMBEDDING_MODEL_NAME: Qwen3-Embedding-0.6B
-      PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION: 1024
-      PROJECT_INDEX_DEFAULTS_PARSER_NAME: docling
-      PROJECT_INDEX_DEFAULTS_PARSER_VERSION: ""
-      PROJECT_INDEX_DEFAULTS_CHUNKING_STRATEGY: recursive
-      PROJECT_INDEX_DEFAULTS_CHUNK_SIZE: 1200
-      PROJECT_INDEX_DEFAULTS_CHUNK_OVERLAP: 200
-      PROJECT_INDEX_DEFAULTS_CHUNK_UNIT: characters
-      PROJECT_INDEX_DEFAULTS_TOKENIZER_NAME: ""
-      QUERY_REWRITE_DEFAULT_ENABLED: "true"
-      RAG_RETRIEVAL_TOP_K: 8
-      RAG_CONTEXT_TOP_N: 4
-      CONTRADICTION_MAX_DISTANCE: 0.35
-      CONTRADICTION_TOP_K_PER_BASE_CHUNK: 1
-      CONTRADICTION_MAX_CANDIDATES_PER_TARGET: 20
-      CONTRADICTION_MAX_PAIRS_PER_JOB: 50
-      MAX_CONTRADICTION_RETRIEVAL_CONCURRENT_TARGETS: 4
-      MAX_CONTRADICTION_LLM_CONCURRENT_REQUESTS: 3
-    ports:
-      - "8080:8080"
+      DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}
+      DOCLING_TIMEOUT_SECONDS: ${DOCLING_TIMEOUT_SECONDS:-300}
+      USE_DOCLING: ${USE_DOCLING:-true}
+      UPLOAD_MAX_SIZE_MB: ${UPLOAD_MAX_SIZE_MB:-25}
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      QDRANT_COLLECTION_NAME: ${QDRANT_COLLECTION_NAME:-mimir_project}
+      QDRANT_ON_DISK_PAYLOAD: ${QDRANT_ON_DISK_PAYLOAD:-true}
+      SPARSE_VECTOR_ENABLED: ${SPARSE_VECTOR_ENABLED:-true}
+      SPARSE_MODEL: ${SPARSE_MODEL:-Qdrant/bm25}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
+      LLM_HTTP_TIMEOUT: ${LLM_TIMEOUT_SECONDS:-120}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-3}
+      LLM_RETRY_DELAY: ${LLM_RETRY_DELAY:-5}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://routerai.ru/api/v1}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-minishlab/potion-base-32M}
+      EMBEDDING_VECTOR_SIZE: ${EMBEDDING_VECTOR_SIZE:-256}
+      EMBEDDING_API_TYPE: ${EMBEDDING_API_TYPE:-openai_compatible}
+      EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-32}
+      EMBEDDING_TIMEOUT_SECONDS: ${EMBEDDING_TIMEOUT_SECONDS:-30}
+      EMBEDDING_MAX_RETRIES: ${EMBEDDING_MAX_RETRIES:-3}
+      EMBEDDING_RETRY_DELAY: ${EMBEDDING_RETRY_DELAY:-5}
+      TEI_BASE_URL: ${EMBEDDING_BASE_URL:-https://routerai.ru/api/v1}
+      TEI_HTTP_TIMEOUT: ${EMBEDDING_TIMEOUT_SECONDS:-30}
+      TEI_EMBED_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-32}
+      MAX_EMBEDDING_CONCURRENT_REQUESTS: ${MAX_EMBEDDING_CONCURRENT_REQUESTS:-2}
+      PROJECT_INDEX_DEFAULTS_EMBEDDING_MODEL_NAME: ${PROJECT_INDEX_DEFAULTS_EMBEDDING_MODEL_NAME:-minishlab/potion-base-32M}
+      PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION: ${EMBEDDING_VECTOR_SIZE:-256}
+      PROJECT_INDEX_DEFAULTS_CHUNK_SIZE: ${PROJECT_INDEX_DEFAULTS_CHUNK_SIZE:-1200}
+      PROJECT_INDEX_DEFAULTS_CHUNK_OVERLAP: ${PROJECT_INDEX_DEFAULTS_CHUNK_OVERLAP:-200}
+      RAG_DENSE_WEIGHT: ${RAG_DENSE_WEIGHT:-0.7}
+      RAG_SPARSE_WEIGHT: ${RAG_SPARSE_WEIGHT:-0.3}
+      RAG_RETRIEVAL_TOP_K: ${RAG_RETRIEVAL_TOP_K:-5}
+      CONTRADICTION_DENSE_WEIGHT: ${CONTRADICTION_DENSE_WEIGHT:-0.5}
+      CONTRADICTION_SPARSE_WEIGHT: ${CONTRADICTION_SPARSE_WEIGHT:-0.5}
+      CONTRADICTION_TOP_K: ${CONTRADICTION_TOP_K:-5}
+      CONTRADICTION_MAX_DISTANCE: ${CONTRADICTION_MAX_DISTANCE:-0.3}
+      CONTRADICTION_MAX_CANDIDATES_PER_TARGET: ${CONTRADICTION_MAX_CANDIDATES_PER_TARGET:-20}
+      CONTRADICTION_MAX_PAIRS_PER_JOB: ${CONTRADICTION_MAX_PAIRS_PER_JOB:-50}
+      MAX_CONTRADICTION_RETRIEVAL_CONCURRENT_TARGETS: ${MAX_CONTRADICTION_RETRIEVAL_CONCURRENT_TARGETS:-4}
+      MAX_CONTRADICTION_LLM_CONCURRENT_REQUESTS: ${MAX_CONTRADICTION_LLM_CONCURRENT_REQUESTS:-3}
+      GRAYLOG_ENABLED: ${GRAYLOG_ENABLED:-true}
+      GRAYLOG_HOST: ${GRAYLOG_HOST:-graylog}
+      GRAYLOG_PORT: ${GRAYLOG_PORT:-12201}
+      OBJECT_STORAGE_PROVIDER: ${OBJECT_STORAGE_PROVIDER:-local}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
     volumes:
-      - mimir_files:/app/var/files
+      - mimir_files:/app/storage
+    networks:
+      - mimir
 
   worker:
     build:
       context: .
-      target: runtime
+    container_name: mimir-worker
     restart: unless-stopped
     depends_on:
-      postgres-vector:
+      postgres:
         condition: service_healthy
-      migrator:
-        condition: service_completed_successfully
-    command: ["/app/mimir-worker"]
+        required: false
+      qdrant:
+        condition: service_healthy
+        required: false
+    command: ["python", "-m", "app.worker.worker"]
     environment:
-      APP_ENV: container
-      LOG_LEVEL: INFO
-      ENABLE_LOCAL_FALLBACKS: "false"
-      DEPENDENCY_STARTUP_CHECKS_ENABLED: "true"
-      HTTP_HOST: 0.0.0.0
-      HTTP_PORT: 8080
-      HTTP_PUBLIC_BASE_URL: http://localhost:8080
-      HTTP_READ_TIMEOUT: 15s
-      HTTP_WRITE_TIMEOUT: 15s
-      HTTP_IDLE_TIMEOUT: 60s
-      HTTP_MAX_UPLOAD_SIZE_BYTES: 26214400
-      POSTGRES_DSN: postgres://knowledge_base_admin:pass123!@postgres-vector:5432/knowledge_base?sslmode=disable
-      POSTGRES_MAX_CONNS: 10
-      POSTGRES_MIN_CONNS: 2
-      WORKER_POLL_INTERVAL: 3s
-      WORKER_BATCH_SIZE: 10
-      FILES_ROOT_DIR: /app/var/files
+      APP_ENV: ${APP_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      POSTGRES_DSN: ${POSTGRES_DSN:-postgres://mimir:mimir@postgres:5432/mimir_db}
+      POSTGRES_MAX_CONNS: ${POSTGRES_MAX_CONNS:-10}
+      POSTGRES_MIN_CONNS: ${POSTGRES_MIN_CONNS:-2}
+      FILES_ROOT_DIR: /app/storage
       PROMPTS_DIR: /app/prompts
-      DOCLING_BASE_URL: http://docling:5001
-      TEI_BASE_URL: http://tei:8080
-      TEI_HTTP_TIMEOUT: 180s
-      TEI_EMBED_BATCH_SIZE: 16
-      MAX_EMBEDDING_CONCURRENT_REQUESTS: 2
-      LLM_PROVIDER: deepseek
-      LLM_API_TYPE: openai_compatible
-      LLM_PROVIDER_BASE_URL: http://llm-provider:8000
-      LLM_PROVIDER_API_KEY: ""
-      LLM_MODEL_NAME: deepseek-chat
-      PROJECT_INDEX_DEFAULTS_INGESTION_PIPELINE_ID: 1
-      PROJECT_INDEX_DEFAULTS_EMBEDDING_PIPELINE_ID: 1
-      PROJECT_INDEX_DEFAULTS_EMBEDDING_MODEL_NAME: Qwen3-Embedding-0.6B
-      PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION: 1024
-      PROJECT_INDEX_DEFAULTS_PARSER_NAME: docling
-      PROJECT_INDEX_DEFAULTS_PARSER_VERSION: ""
-      PROJECT_INDEX_DEFAULTS_CHUNKING_STRATEGY: recursive
-      PROJECT_INDEX_DEFAULTS_CHUNK_SIZE: 1200
-      PROJECT_INDEX_DEFAULTS_CHUNK_OVERLAP: 200
-      PROJECT_INDEX_DEFAULTS_CHUNK_UNIT: characters
-      PROJECT_INDEX_DEFAULTS_TOKENIZER_NAME: ""
-      QUERY_REWRITE_DEFAULT_ENABLED: "true"
-      RAG_RETRIEVAL_TOP_K: 8
-      RAG_CONTEXT_TOP_N: 4
-      CONTRADICTION_MAX_DISTANCE: 0.35
-      CONTRADICTION_TOP_K_PER_BASE_CHUNK: 1
-      CONTRADICTION_MAX_CANDIDATES_PER_TARGET: 20
-      CONTRADICTION_MAX_PAIRS_PER_JOB: 50
-      MAX_CONTRADICTION_RETRIEVAL_CONCURRENT_TARGETS: 4
-      MAX_CONTRADICTION_LLM_CONCURRENT_REQUESTS: 3
+      DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}
+      DOCLING_TIMEOUT_SECONDS: ${DOCLING_TIMEOUT_SECONDS:-300}
+      USE_DOCLING: ${USE_DOCLING:-true}
+      UPLOAD_MAX_SIZE_MB: ${UPLOAD_MAX_SIZE_MB:-25}
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      QDRANT_COLLECTION_NAME: ${QDRANT_COLLECTION_NAME:-mimir_project}
+      QDRANT_ON_DISK_PAYLOAD: ${QDRANT_ON_DISK_PAYLOAD:-true}
+      SPARSE_VECTOR_ENABLED: ${SPARSE_VECTOR_ENABLED:-true}
+      SPARSE_MODEL: ${SPARSE_MODEL:-Qdrant/bm25}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
+      LLM_HTTP_TIMEOUT: ${LLM_TIMEOUT_SECONDS:-120}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-3}
+      LLM_RETRY_DELAY: ${LLM_RETRY_DELAY:-5}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://routerai.ru/api/v1}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-minishlab/potion-base-32M}
+      EMBEDDING_VECTOR_SIZE: ${EMBEDDING_VECTOR_SIZE:-256}
+      EMBEDDING_API_TYPE: ${EMBEDDING_API_TYPE:-openai_compatible}
+      EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-32}
+      EMBEDDING_TIMEOUT_SECONDS: ${EMBEDDING_TIMEOUT_SECONDS:-30}
+      EMBEDDING_MAX_RETRIES: ${EMBEDDING_MAX_RETRIES:-3}
+      EMBEDDING_RETRY_DELAY: ${EMBEDDING_RETRY_DELAY:-5}
+      TEI_BASE_URL: ${EMBEDDING_BASE_URL:-https://routerai.ru/api/v1}
+      TEI_HTTP_TIMEOUT: ${EMBEDDING_TIMEOUT_SECONDS:-30}
+      TEI_EMBED_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-32}
+      MAX_EMBEDDING_CONCURRENT_REQUESTS: ${MAX_EMBEDDING_CONCURRENT_REQUESTS:-2}
+      WORKER_POLL_INTERVAL: ${WORKER_POLL_INTERVAL_SECONDS:-3}
+      PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION: ${EMBEDDING_VECTOR_SIZE:-256}
+      PROJECT_INDEX_DEFAULTS_CHUNK_SIZE: ${PROJECT_INDEX_DEFAULTS_CHUNK_SIZE:-1200}
+      PROJECT_INDEX_DEFAULTS_CHUNK_OVERLAP: ${PROJECT_INDEX_DEFAULTS_CHUNK_OVERLAP:-200}
+      CONTRADICTION_DENSE_WEIGHT: ${CONTRADICTION_DENSE_WEIGHT:-0.5}
+      CONTRADICTION_SPARSE_WEIGHT: ${CONTRADICTION_SPARSE_WEIGHT:-0.5}
+      CONTRADICTION_TOP_K: ${CONTRADICTION_TOP_K:-5}
+      CONTRADICTION_MAX_DISTANCE: ${CONTRADICTION_MAX_DISTANCE:-0.3}
+      CONTRADICTION_MAX_CANDIDATES_PER_TARGET: ${CONTRADICTION_MAX_CANDIDATES_PER_TARGET:-20}
+      CONTRADICTION_MAX_PAIRS_PER_JOB: ${CONTRADICTION_MAX_PAIRS_PER_JOB:-50}
+      MAX_CONTRADICTION_RETRIEVAL_CONCURRENT_TARGETS: ${MAX_CONTRADICTION_RETRIEVAL_CONCURRENT_TARGETS:-4}
+      MAX_CONTRADICTION_LLM_CONCURRENT_REQUESTS: ${MAX_CONTRADICTION_LLM_CONCURRENT_REQUESTS:-3}
+      OBJECT_STORAGE_PROVIDER: ${OBJECT_STORAGE_PROVIDER:-local}
+      GRAYLOG_ENABLED: ${GRAYLOG_ENABLED:-true}
+      GRAYLOG_HOST: ${GRAYLOG_HOST:-graylog}
+      GRAYLOG_PORT: ${GRAYLOG_PORT:-12201}
     volumes:
-      - mimir_files:/app/var/files
+      - mimir_files:/app/storage
+    networks:
+      - mimir
 
 volumes:
-  mimir_postgres_data:
   mimir_files:
+
+networks:
+  mimir:
+    name: mimir
+    driver: bridge

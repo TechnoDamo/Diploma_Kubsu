@@ -1,6 +1,10 @@
+.env
+.venv
+__pycache__
+*.pyc
+.uv-cache
 .git
 .gitignore
-var
-tmp
-coverage.out
-*.log
+*.md
+tests/
+var/

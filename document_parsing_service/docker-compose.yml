@@ -1,0 +1,17 @@
+services:
+  docling:
+    profiles: ["local-docling"]
+    image: quay.io/docling-project/docling-serve
+    container_name: mimir-docling
+    restart: unless-stopped
+    ports:
+      - "${DOCLING_PORT:-5001}:5001"
+    environment:
+      DOCLING_SERVE_ENABLE_UI: ${DOCLING_SERVE_ENABLE_UI:-1}
+    networks:
+      - mimir
+
+networks:
+  mimir:
+    name: mimir
+    driver: bridge

@@ -1,28 +1,30 @@
-FROM golang:1.24-alpine AS test
+FROM python:3.12-slim AS base
 
-WORKDIR /src/api
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    UV_LINK_MODE=copy \
+    PATH="/app/.venv/bin:$PATH"
 
-COPY . .
+RUN apt-get update -y && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN go test ./...
-
-FROM test AS builder
-
-RUN go build -o /out/mimir-api ./cmd/api
-RUN go build -o /out/mimir-worker ./cmd/worker
-
-FROM alpine:3.21 AS runtime
+RUN python -m pip install --no-cache-dir uv
 
 WORKDIR /app
 
-RUN apk add --no-cache ca-certificates curl
+COPY pyproject.toml ./
+RUN uv sync --no-dev
 
-COPY --from=builder /out/mimir-api /app/mimir-api
-COPY --from=builder /out/mimir-worker /app/mimir-worker
-COPY ./prompts /app/prompts
+COPY app ./app
+COPY alembic ./alembic
+COPY alembic.ini ./
+COPY prompts ./prompts
 
-RUN mkdir -p /app/var/files
+RUN mkdir -p /app/storage
 
 EXPOSE 8080
 
-CMD ["/app/mimir-api"]
+CMD ["sh", "-c", "DB_URL=$(echo $POSTGRES_DSN | sed 's|^postgres://|postgresql+asyncpg://|') alembic -x sqlalchemy.url=$DB_URL upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8080"]

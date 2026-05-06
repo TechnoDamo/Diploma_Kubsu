@@ -1,20 +1,14 @@
 services:
   llm:
     profiles: ["local-llm"]
-    image: "${VLLM_IMAGE:-vllm/vllm-openai:v0.6.3}"
+    image: ${LLM_GPU_IMAGE:-vllm/vllm-openai:v0.6.3}
     container_name: mimir-llm
-    entrypoint: ["/bin/sh", "/opt/mimir/start-vllm.sh"]
+    entrypoint: /opt/mimir/start-vllm.sh
     ports:
       - "${LLM_PORT:-8091}:8080"
-    environment:
-      HUGGING_FACE_HUB_TOKEN: "${HUGGING_FACE_HUB_TOKEN:-}"
-      HF_ENDPOINT: "${HF_ENDPOINT:-https://huggingface.co}"
-      LLM_MODEL_LOCAL: "${LLM_MODEL_LOCAL:-qwen2.5-0.5b-instruct}"
-      LLM_CTX_SIZE: "${LLM_CTX_SIZE:-2048}"
-      LLM_DTYPE: "${LLM_DTYPE:-bfloat16}"
     volumes:
-      - "${LLM_MODELS_DIR:-../models}:/models"
-      - "./start-vllm.sh:/opt/mimir/start-vllm.sh:ro"
+      - ${LLM_MODELS_DIR:-${HOME}/.cache/huggingface/hub}:/models
+      - ./start-vllm.sh:/opt/mimir/start-vllm.sh:ro
     deploy:
       resources:
         reservations:
@@ -26,8 +20,8 @@ services:
       - mimir
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
-      interval: 30s
-      timeout: 10s
+      interval: 10s
+      timeout: 5s
       retries: 10
       start_period: 120s
 

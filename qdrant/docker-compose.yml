@@ -1,21 +1,20 @@
 services:
   qdrant:
     profiles: ["local-qdrant"]
-    image: "${QDRANT_IMAGE:-qdrant/qdrant:v1.12.0}"
+    image: ${QDRANT_IMAGE:-qdrant/qdrant:v1.12.0}
     container_name: mimir-qdrant
     ports:
       - "${QDRANT_PORT:-6333}:6333"
     volumes:
       - qdrant_data:/qdrant/storage
-    environment:
-      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-}
     networks:
       - mimir
     healthcheck:
-      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/6333'"]
+      test: ["CMD-SHELL", "timeout 1 bash -c 'echo >/dev/tcp/localhost/6333' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 10s
 
 volumes:
   qdrant_data:

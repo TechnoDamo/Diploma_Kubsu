@@ -1,0 +1,22 @@
+Sample Document - Plain Text Format
+====================================
+
+This is a sample document for testing the document processing pipeline.
+It contains information about records retention policies.
+
+Section 1: Overview
+-------------------
+The organization maintains a comprehensive records management program.
+All records must be classified according to their retention category.
+
+Section 2: Retention Periods
+---------------------------
+Financial records: 7 years
+Personnel files: 5 years after termination
+Contracts: 10 years after expiration
+Tax documents: Permanent retention
+
+Section 3: Compliance
+--------------------
+All departments must comply with the records retention schedule.
+Violations may result in regulatory penalties.
