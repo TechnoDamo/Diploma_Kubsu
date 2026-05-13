@@ -10,8 +10,7 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from app.models.base import Base
-from app.models import *  # noqa: F401, F403 — ensure all models are imported
+from app.database import Base
 
 config = context.config
 if config.config_file_name is not None:
