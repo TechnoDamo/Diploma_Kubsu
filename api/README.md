@@ -142,17 +142,28 @@ backend.
 Для проверки retrieval через API без LLM есть отдельный endpoint:
 
 ```bash
-curl -fsS -X POST "http://localhost:8080/api/v1/projects/166/retrieval/query" \
+API_BASE="http://localhost:8080/api/v1"
+PROJECT_ID=166
+TARGET_DOCUMENT_ID=381
+
+# 1. Найти нужный project_id
+curl -fsS "${API_BASE}/projects?limit=100" | python -m json.tool --no-ensure-ascii
+
+# 2. Найти document_id внутри проекта
+curl -fsS "${API_BASE}/projects/${PROJECT_ID}/documents?limit=100" | python -m json.tool --no-ensure-ascii
+
+# 3. Проверить retrieval по raw text
+curl -fsS -X POST "${API_BASE}/projects/${PROJECT_ID}/retrieval/query" \
   -H 'Content-Type: application/json' \
   -d '{
     "text": "срок выплаты заработной платы",
-    "target_document_ids": [381],
+    "target_document_ids": ['"${TARGET_DOCUMENT_ID}"'],
     "dense_weight": 0.7,
     "sparse_weight": 0.3,
     "limit": 5,
     "include_text": true,
     "include_payload": true
-  }'
+  }' | python -m json.tool --no-ensure-ascii
 ```
 
 Ответ содержит имя Qdrant collection, фактически выбранный режим retrieval
@@ -181,7 +192,7 @@ curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/sc
     "limit": 5,
     "with_payload": true,
     "with_vector": true
-  }'
+  }' | python -m json.tool --no-ensure-ascii
 ```
 
 Dense recommend search от существующего point:

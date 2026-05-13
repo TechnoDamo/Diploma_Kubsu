@@ -9,7 +9,7 @@ cat <<'EOF'
 curl -fsS "http://localhost:8080/healthz"
 
 # List projects
-curl -fsS "http://localhost:8080/api/v1/projects"
+curl -fsS "http://localhost:8080/api/v1/projects?limit=100" | python -m json.tool --no-ensure-ascii
 
 # Create project
 curl -fsS -X POST "http://localhost:8080/api/v1/projects" \
@@ -17,16 +17,16 @@ curl -fsS -X POST "http://localhost:8080/api/v1/projects" \
   -d '{
     "name": "Contracts Review Project",
     "description": "Project for contract comparison and RAG testing"
-  }'
+  }' | python -m json.tool --no-ensure-ascii
 
 # Get project with id 1
-curl -fsS "http://localhost:8080/api/v1/projects/1"
+curl -fsS "http://localhost:8080/api/v1/projects/1" | python -m json.tool --no-ensure-ascii
 
 # Delete project with id 1
 curl -fsS -X DELETE "http://localhost:8080/api/v1/projects/1"
 
 # List documents for project 1
-curl -fsS "http://localhost:8080/api/v1/projects/1/documents"
+curl -fsS "http://localhost:8080/api/v1/projects/1/documents?limit=100" | python -m json.tool --no-ensure-ascii
 
 # Upload plain-text document to project 1
 curl -fsS -X POST "http://localhost:8080/api/v1/projects/1/documents" \
@@ -59,13 +59,13 @@ curl -fsS -X POST "http://localhost:8080/api/v1/projects/1/documents" \
   -F "display_name=incident_response_playbook.txt"
 
 # Get document metadata for document 1 in project 1
-curl -fsS "http://localhost:8080/api/v1/projects/1/documents/1"
+curl -fsS "http://localhost:8080/api/v1/projects/1/documents/1" | python -m json.tool --no-ensure-ascii
 
 # Download original document content for document 1 in project 1
 curl -fsS "http://localhost:8080/api/v1/projects/1/documents/1/content"
 
 # Get reconstructed document text for document 1 in project 1
-curl -fsS "http://localhost:8080/api/v1/projects/1/documents/1/text"
+curl -fsS "http://localhost:8080/api/v1/projects/1/documents/1/text" | python -m json.tool --no-ensure-ascii
 
 # Delete document 1 in project 1
 curl -fsS -X DELETE "http://localhost:8080/api/v1/projects/1/documents/1"
@@ -75,7 +75,7 @@ curl -fsS -X POST "http://localhost:8080/api/v1/projects/1/rag/query" \
   -H 'Content-Type: application/json' \
   -d '{
     "question": "What is the payment deadline?"
-  }'
+  }' | python -m json.tool --no-ensure-ascii
 
 # RAG query against explicit documents in project 1
 curl -fsS -X POST "http://localhost:8080/api/v1/projects/1/rag/query" \
@@ -83,14 +83,14 @@ curl -fsS -X POST "http://localhost:8080/api/v1/projects/1/rag/query" \
   -d '{
     "question": "What are the retention obligations?",
     "target_document_ids": [1, 2, 3]
-  }'
+  }' | python -m json.tool --no-ensure-ascii
 
 # Start contradiction analysis across all other indexed documents in project 1, using document 1 as the base
 curl -fsS -X POST "http://localhost:8080/api/v1/projects/1/analysis/contradictions" \
   -H 'Content-Type: application/json' \
   -d '{
     "base_document_id": 1
-  }'
+  }' | python -m json.tool --no-ensure-ascii
 
 # Start contradiction analysis for base document 1 against explicit target document 2 in project 1
 curl -fsS -X POST "http://localhost:8080/api/v1/projects/1/analysis/contradictions" \
@@ -98,10 +98,10 @@ curl -fsS -X POST "http://localhost:8080/api/v1/projects/1/analysis/contradictio
   -d '{
     "base_document_id": 1,
     "target_document_ids": [2]
-  }'
+  }' | python -m json.tool --no-ensure-ascii
 
 # Poll contradiction analysis job 1 for project 1
-curl -fsS "http://localhost:8080/api/v1/projects/1/analysis/contradictions/1"
+curl -fsS "http://localhost:8080/api/v1/projects/1/analysis/contradictions/1" | python -m json.tool --no-ensure-ascii
 
 ###############################################################################
 # Retrieval debug endpoint
@@ -111,17 +111,27 @@ curl -fsS "http://localhost:8080/api/v1/projects/1/analysis/contradictions/1"
 
 # Hybrid retrieval through the API. Set sparse_weight=0 for dense-only or
 # dense_weight=0 for sparse-only.
-curl -fsS -X POST "http://localhost:8080/api/v1/projects/166/retrieval/query" \
+API_BASE="http://localhost:8080/api/v1"
+PROJECT_ID=166
+TARGET_DOCUMENT_ID=381
+
+# Discover available projects first.
+curl -fsS "${API_BASE}/projects?limit=100" | python -m json.tool --no-ensure-ascii
+
+# Discover documents inside the selected project.
+curl -fsS "${API_BASE}/projects/${PROJECT_ID}/documents?limit=100" | python -m json.tool --no-ensure-ascii
+
+curl -fsS -X POST "${API_BASE}/projects/${PROJECT_ID}/retrieval/query" \
   -H 'Content-Type: application/json' \
   -d '{
     "text": "срок выплаты заработной платы",
-    "target_document_ids": [381],
+    "target_document_ids": ['"${TARGET_DOCUMENT_ID}"'],
     "dense_weight": 0.7,
     "sparse_weight": 0.3,
     "limit": 5,
     "include_text": true,
     "include_payload": true
-  }'
+  }' | python -m json.tool --no-ensure-ascii
 
 ###############################################################################
 # Direct Qdrant retrieval checks
@@ -148,7 +158,7 @@ curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/sc
     "limit": 5,
     "with_payload": true,
     "with_vector": true
-  }'
+  }' | python -m json.tool --no-ensure-ascii
 
 # Dense recommend search from an existing point id into a target document.
 curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/query" \
@@ -159,7 +169,7 @@ curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/qu
     "filter": {"must": [{"key": "document_id", "match": {"value": 381}}]},
     "limit": 5,
     "with_payload": true
-  }'
+  }' | python -m json.tool --no-ensure-ascii
 
 # Sparse search. Use real indices/values from a generated BM25 sparse vector.
 curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/query" \
@@ -170,7 +180,7 @@ curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/qu
     "filter": {"must": [{"key": "document_id", "match": {"value": 381}}]},
     "limit": 5,
     "with_payload": true
-  }'
+  }' | python -m json.tool --no-ensure-ascii
 
 # Raw Qdrant hybrid fusion. This mirrors Mimir's hybrid backend path when both
 # dense and sparse branches are enabled. Requires Qdrant 1.17.0+.
@@ -193,5 +203,5 @@ curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/qu
     "filter": {"must": [{"key": "document_id", "match": {"value": 381}}]},
     "limit": 5,
     "with_payload": true
-  }'
+  }' | python -m json.tool --no-ensure-ascii
 EOF
