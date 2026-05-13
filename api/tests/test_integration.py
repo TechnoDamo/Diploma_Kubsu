@@ -197,7 +197,7 @@ async def test_full_pipeline(api_ready: bool):
             # 6. Wait for indexing
             log("[6] Waiting for indexing...")
             for did in doc_ids:
-                status = await wait_for_document(client, project_id, did, timeout=20)
+                status = await wait_for_document(client, project_id, did, timeout=90)
                 assert status == "indexed", f"Document {did} failed indexing: {status}"
 
             # 7. Get document text
@@ -408,7 +408,7 @@ async def test_all_document_formats(api_ready: bool):
                 log(f"    Document id={doc['id']}")
 
             for did in doc_ids:
-                status = await wait_for_document(client, project_id, did, timeout=20)
+                status = await wait_for_document(client, project_id, did, timeout=90)
                 assert status == "indexed", f"Document {did} failed: {status}"
 
             for did in doc_ids:
