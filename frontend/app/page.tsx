@@ -25,6 +25,8 @@ import {
 import { ragApi } from '@/lib/api';
 import {
   ApiError,
+  type Contradiction,
+  type ContradictionResult,
   type Document,
   type Project,
   type ServerStatus,
@@ -97,19 +99,7 @@ type ContradictionJob = {
   targetDocumentIds: number[];
   createdAt: string;
   updatedAt: string;
-  result?: {
-    target_document_id: number;
-    target_document_name: string;
-    summary: string;
-    contradictions: {
-      base_text: string;
-      target_text: string;
-      confidence: number;
-      explanation: string;
-      base_chunk_order: number;
-      target_chunk_order: number;
-    }[];
-  }[];
+  result?: ContradictionResult[];
   error?: string;
 };
 
@@ -746,7 +736,7 @@ export default function HomePage() {
       try {
         const res = await ragApi.listAnalysisJobs(projectId);
         if (cancelled) return;
-        const jobs: ContradictionJob[] = res.items.map((item: any) => ({
+        const jobs: ContradictionJob[] = res.items.map((item) => ({
           id: item.id,
           status: item.status as ContradictionJob['status'],
           baseDocumentId: item.base_document_id,
@@ -764,7 +754,7 @@ export default function HomePage() {
       try {
         const res = await ragApi.listAnalysisJobs(projectId);
         if (cancelled) return;
-        const jobs: ContradictionJob[] = res.items.map((item: any) => ({
+        const jobs: ContradictionJob[] = res.items.map((item) => ({
           id: item.id,
           status: item.status as ContradictionJob['status'],
           baseDocumentId: item.base_document_id,
@@ -2177,7 +2167,7 @@ export default function HomePage() {
         <div className="min-w-0">
           <p className="text-base font-semibold">Анализ противоречий</p>
           <p className="truncate text-sm text-[var(--muted)]">
-            {contradictionJobs.length} активных задач
+            {contradictionJobs.length} задач
           </p>
         </div>
         <button
@@ -2314,17 +2304,17 @@ export default function HomePage() {
                         {job.targetDocumentIds.map(id => documents.find(d => d.id === id)?.name || id).join(', ') || 'Нет'}
                       </span>
                     </div>
-                    {job.status === 'completed' && job.result && (
+                    {job.status === 'completed' && job.result && job.result.length > 0 && (
                       <div className="space-y-3">
-                        {job.result.map((group: any, gi: number) => (
+                        {job.result.map((group: ContradictionResult, gi: number) => (
                           <div key={gi} className="rounded-lg border border-[var(--line)] p-3">
                             <div className="text-sm font-medium mb-2 text-amber-200">
-                              {group.target_document_name || group.targetName || `Документ #${group.target_document_id}`}
+                              {group.target_document_name || `Документ #${group.target_document_id}`}
                             </div>
                             {group.summary && (
                               <p className="text-xs text-[var(--muted)] mb-2 leading-relaxed">{group.summary}</p>
                             )}
-                            {group.contradictions?.map((c: any, ci: number) => (
+                            {group.contradictions?.map((c: Contradiction, ci: number) => (
                               <div key={ci} className="mt-2 border-l-2 border-l-amber-400 pl-3 text-xs space-y-1">
                                 <p className="text-[var(--text)] opacity-80">База: {c.base_text}</p>
                                 <p className="text-[var(--text)] opacity-80">Цель: {c.target_text}</p>
@@ -2335,7 +2325,7 @@ export default function HomePage() {
                         ))}
                       </div>
                     )}
-                    {job.status === 'completed' && !job.result && (
+                    {job.status === 'completed' && (!job.result || job.result.length === 0) && (
                       <p className="text-sm text-[var(--muted)]">Противоречий не найдено.</p>
                     )}
                     {job.status === 'processing' && (

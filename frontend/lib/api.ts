@@ -1,5 +1,6 @@
 import {
   type AnalysisJobAcceptedResponse,
+  type AnalysisJobListResponse,
   ApiError,
   type ContradictionAnalysisResponse,
   type CreateProjectRequest,
@@ -210,8 +211,8 @@ export const ragApi = {
     );
   },
 
-  async listAnalysisJobs(projectId: ProjectId): Promise<{ items: any[] }> {
-    return requestJson<{ items: any[] }>(
+  async listAnalysisJobs(projectId: ProjectId): Promise<AnalysisJobListResponse> {
+    return requestJson<AnalysisJobListResponse>(
       `/projects/${projectId}/analysis/contradictions`
     );
   },

@@ -122,6 +122,24 @@ export type ContradictionAnalysisResponse =
   | CompletedContradictionAnalysisResponse
   | FailedContradictionAnalysisResponse;
 
+export type AnalysisJobListItem = {
+  id: JobId;
+  project_id: ProjectId;
+  base_document_id: DocumentId;
+  target_document_ids: DocumentId[];
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  created_at: string;
+  updated_at: string;
+  completed_at?: string;
+  warning_message?: string;
+  error_message?: string;
+  results?: ContradictionResult[];
+};
+
+export type AnalysisJobListResponse = {
+  items: AnalysisJobListItem[];
+};
+
 export type ApiErrorPayload = {
   error: {
     code: string;
