@@ -39,7 +39,7 @@ class GELFLogHandler(logging.Handler):
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
                 sock.sendto(payload, (self._host, self._port))
         except Exception:
-            self.handleError(record)
+            pass  # silently ignore Graylog delivery failures
 
 
 def setup_logging(

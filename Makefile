@@ -1,5 +1,7 @@
+DOCKER_BUILDKIT ?= 1
 COMPOSE ?= docker compose
 COMPOSE_FILE ?= docker-compose.yml
+API_IMAGE ?= mimir-api:local
 
 LLM ?= cloud
 EMBEDDING ?= cloud
@@ -66,19 +68,24 @@ else
 ENV_ARGS += GRAYLOG_ENABLED=false
 endif
 
-ENV_ARGS += PROMPTS_DIR=/app/prompts EMBEDDING_VECTOR_SIZE=$(EMBEDDING_VECTOR_SIZE)
+ENV_ARGS += PROMPTS_DIR=/app/prompts
+DOCKER_ENV := DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) API_IMAGE=$(API_IMAGE)
 
 help:
 	@echo "Mimir — Интеллектуальная RAG-система"
 	@echo ""
 	@echo "make up                       — дефолтный стек (LLM/embedding=cloud, остальное=local, Graylog=on)"
+	@echo "make fast-up                  — быстрый стек без Graylog"
+	@echo "make up-build                 — запустить и пересобрать изменившиеся образы"
 	@echo "make up LLM=local             — с локальной LLM на GPU"
 	@echo "make up EMBEDDING=local       — с локальными эмбеддингами на GPU"
 	@echo "make up LLM=local EMBEDDING=local — полностью локальный AI на GPU"
 	@echo "make up OBJECT_STORAGE=local  — с MinIO"
 	@echo "make up GRAYLOG=false         — без Graylog"
 	@echo "make down                     — остановить всё"
-	@echo "make restart                  — перезапустить"
+	@echo "make restart                  — быстрый перезапуск без пересборки"
+	@echo "make recreate                 — пересоздать контейнеры без пересборки"
+	@echo "make build                    — собрать образы без запуска"
 	@echo "make rebuild                  — пересобрать образы с нуля и перезапустить"
 	@echo ""
 	@echo "Флаги: LLM=local|cloud EMBEDDING=local|cloud DOCLING=local|cloud"
@@ -86,17 +93,30 @@ help:
 	@echo "       OBJECT_STORAGE=filesystem|local|cloud GRAYLOG=local|false"
 
 up:
-	$(LOAD_ENV) env $(ENV_ARGS) $(COMPOSE) -f $(COMPOSE_FILE) $(PROFILE_ARGS) up -d --build --remove-orphans
+	@docker image inspect $(API_IMAGE) >/dev/null 2>&1 || $(MAKE) build API_IMAGE=$(API_IMAGE)
+	$(LOAD_ENV) env $(DOCKER_ENV) $(ENV_ARGS) $(COMPOSE) -f $(COMPOSE_FILE) $(PROFILE_ARGS) up -d --remove-orphans
+
+fast-up:
+	$(MAKE) up GRAYLOG=false
+
+up-build:
+	$(LOAD_ENV) env $(DOCKER_ENV) $(ENV_ARGS) $(COMPOSE) -f $(COMPOSE_FILE) $(PROFILE_ARGS) up -d --build --remove-orphans
 
 down:
 	$(COMPOSE) -f $(COMPOSE_FILE) $(ALL_PROFILE_ARGS) down
 
 restart:
-	$(LOAD_ENV) env $(ENV_ARGS) $(COMPOSE) -f $(COMPOSE_FILE) $(PROFILE_ARGS) up -d --build --force-recreate --remove-orphans
+	$(LOAD_ENV) env $(DOCKER_ENV) $(ENV_ARGS) $(COMPOSE) -f $(COMPOSE_FILE) $(PROFILE_ARGS) restart
+
+recreate:
+	$(LOAD_ENV) env $(DOCKER_ENV) $(ENV_ARGS) $(COMPOSE) -f $(COMPOSE_FILE) $(PROFILE_ARGS) up -d --force-recreate --remove-orphans
+
+build:
+	$(LOAD_ENV) env $(DOCKER_ENV) $(ENV_ARGS) $(COMPOSE) -f $(COMPOSE_FILE) $(PROFILE_ARGS) build api
 
 rebuild:
-	$(LOAD_ENV) env $(ENV_ARGS) $(COMPOSE) -f $(COMPOSE_FILE) $(PROFILE_ARGS) build --no-cache
-	$(LOAD_ENV) env $(ENV_ARGS) $(COMPOSE) -f $(COMPOSE_FILE) $(PROFILE_ARGS) up -d --force-recreate --remove-orphans
+	$(LOAD_ENV) env $(DOCKER_ENV) $(ENV_ARGS) $(COMPOSE) -f $(COMPOSE_FILE) $(PROFILE_ARGS) build --no-cache api
+	$(LOAD_ENV) env $(DOCKER_ENV) $(ENV_ARGS) $(COMPOSE) -f $(COMPOSE_FILE) $(PROFILE_ARGS) up -d --force-recreate --remove-orphans
 
 logs:
 	$(COMPOSE) -f $(COMPOSE_FILE) $(PROFILE_ARGS) logs -f

@@ -66,9 +66,16 @@ async function parseError(response: Response): Promise<ApiError> {
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const isFormData = init?.body instanceof FormData;
+  const headers = isFormData
+    ? buildHeaders('*/*', init?.headers)
+    : buildHeaders('application/json', init?.headers);
+  if (isFormData) {
+    headers.delete('Content-Type');
+  }
   const response = await fetch(resolveUrl(path), {
     ...init,
-    headers: buildHeaders('application/json', init?.headers),
+    headers,
     cache: 'no-store'
   });
 
@@ -201,5 +208,17 @@ export const ragApi = {
     return requestJson<ContradictionAnalysisResponse | RagQueryResponse>(
       `/projects/${projectId}/analysis/contradictions/${jobId}`
     );
+  },
+
+  async listAnalysisJobs(projectId: ProjectId): Promise<{ items: any[] }> {
+    return requestJson<{ items: any[] }>(
+      `/projects/${projectId}/analysis/contradictions`
+    );
+  },
+
+  async deleteAnalysisJob(projectId: ProjectId, jobId: JobId): Promise<void> {
+    await requestJson<void>(`/projects/${projectId}/analysis/contradictions/${jobId}`, {
+      method: 'DELETE'
+    });
   }
 };

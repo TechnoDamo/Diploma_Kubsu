@@ -1,5 +1,6 @@
 services:
   api:
+    image: ${API_IMAGE:-mimir-api:local}
     build:
       context: .
     container_name: mimir-api
@@ -14,6 +15,7 @@ services:
     ports:
       - "${APP_PORT:-8080}:8080"
     environment:
+      FASTEMBED_CACHE_PATH: /root/.cache/huggingface
       APP_ENV: ${APP_ENV:-production}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       HTTP_HOST: 0.0.0.0
@@ -44,8 +46,6 @@ services:
       LLM_RETRY_DELAY: ${LLM_RETRY_DELAY:-5}
       EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://routerai.ru/api/v1}
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-minishlab/potion-base-32M}
-      EMBEDDING_VECTOR_SIZE: ${EMBEDDING_VECTOR_SIZE:-256}
       EMBEDDING_API_TYPE: ${EMBEDDING_API_TYPE:-openai_compatible}
       EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-32}
       EMBEDDING_TIMEOUT_SECONDS: ${EMBEDDING_TIMEOUT_SECONDS:-30}
@@ -55,8 +55,8 @@ services:
       TEI_HTTP_TIMEOUT: ${EMBEDDING_TIMEOUT_SECONDS:-30}
       TEI_EMBED_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-32}
       MAX_EMBEDDING_CONCURRENT_REQUESTS: ${MAX_EMBEDDING_CONCURRENT_REQUESTS:-2}
-      PROJECT_INDEX_DEFAULTS_EMBEDDING_MODEL_NAME: ${PROJECT_INDEX_DEFAULTS_EMBEDDING_MODEL_NAME:-minishlab/potion-base-32M}
-      PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION: ${EMBEDDING_VECTOR_SIZE:-256}
+      PROJECT_INDEX_DEFAULTS_EMBEDDING_MODEL_NAME: ${PROJECT_INDEX_DEFAULTS_EMBEDDING_MODEL_NAME:-qwen/qwen3-embedding-4b}
+      PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION: ${PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION:-2560}
       PROJECT_INDEX_DEFAULTS_CHUNK_SIZE: ${PROJECT_INDEX_DEFAULTS_CHUNK_SIZE:-1200}
       PROJECT_INDEX_DEFAULTS_CHUNK_OVERLAP: ${PROJECT_INDEX_DEFAULTS_CHUNK_OVERLAP:-200}
       RAG_DENSE_WEIGHT: ${RAG_DENSE_WEIGHT:-0.7}
@@ -73,16 +73,19 @@ services:
       GRAYLOG_ENABLED: ${GRAYLOG_ENABLED:-true}
       GRAYLOG_HOST: ${GRAYLOG_HOST:-graylog}
       GRAYLOG_PORT: ${GRAYLOG_PORT:-12201}
+      GENERATE_SUMMARY: ${GENERATE_SUMMARY:-false}
       OBJECT_STORAGE_PROVIDER: ${OBJECT_STORAGE_PROVIDER:-local}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
     volumes:
+      - ./app:/app/app:delegated
+      - ./prompts:/app/prompts
       - mimir_files:/app/storage
+      - hf_cache:/root/.cache/huggingface
     networks:
       - mimir
 
   worker:
-    build:
-      context: .
+    image: ${API_IMAGE:-mimir-api:local}
     container_name: mimir-worker
     restart: unless-stopped
     depends_on:
@@ -94,6 +97,7 @@ services:
         required: false
     command: ["python", "-m", "app.worker.worker"]
     environment:
+      FASTEMBED_CACHE_PATH: /root/.cache/huggingface
       APP_ENV: ${APP_ENV:-production}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       POSTGRES_DSN: ${POSTGRES_DSN:-postgres://mimir:mimir@postgres:5432/mimir_db}
@@ -131,7 +135,8 @@ services:
       TEI_EMBED_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-32}
       MAX_EMBEDDING_CONCURRENT_REQUESTS: ${MAX_EMBEDDING_CONCURRENT_REQUESTS:-2}
       WORKER_POLL_INTERVAL: ${WORKER_POLL_INTERVAL_SECONDS:-3}
-      PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION: ${EMBEDDING_VECTOR_SIZE:-256}
+      PROJECT_INDEX_DEFAULTS_EMBEDDING_MODEL_NAME: ${PROJECT_INDEX_DEFAULTS_EMBEDDING_MODEL_NAME:-qwen/qwen3-embedding-4b}
+      PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION: ${PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION:-2560}
       PROJECT_INDEX_DEFAULTS_CHUNK_SIZE: ${PROJECT_INDEX_DEFAULTS_CHUNK_SIZE:-1200}
       PROJECT_INDEX_DEFAULTS_CHUNK_OVERLAP: ${PROJECT_INDEX_DEFAULTS_CHUNK_OVERLAP:-200}
       CONTRADICTION_DENSE_WEIGHT: ${CONTRADICTION_DENSE_WEIGHT:-0.5}
@@ -147,12 +152,16 @@ services:
       GRAYLOG_HOST: ${GRAYLOG_HOST:-graylog}
       GRAYLOG_PORT: ${GRAYLOG_PORT:-12201}
     volumes:
+      - ./app:/app/app:delegated
+      - ./prompts:/app/prompts
       - mimir_files:/app/storage
+      - hf_cache:/root/.cache/huggingface
     networks:
       - mimir
 
 volumes:
   mimir_files:
+  hf_cache:
 
 networks:
   mimir:

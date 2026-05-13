@@ -2,415 +2,330 @@ openapi: 3.1.0
 info:
   title: Mimir RAG API
   version: 1.3.0
-  summary: Strict MVP API for localhost-first RAG document system
+  summary: HTTP API для проектов, документов, RAG-запросов и анализа противоречий
   description: |
-    OpenAPI contract for a localhost-first MVP of Mimir.
+    Актуальная спецификация публичного API Mimir.
 
-    Design choices for this MVP:
-    - No authentication
-    - Project-scoped documents only
-    - Synchronous RAG query
-    - Asynchronous contradiction analysis
-    - Direct file streaming for document content
-    - Page/limit pagination
-    - Stable JSON envelopes for collections and errors
-    - No separate /view endpoint; frontend uses metadata + /content + /text
-    - If request scope omits target documents, the backend searches all indexed documents in the project
-    - PostgreSQL is the source of truth; Qdrant stores dense/sparse vectors only
-    - Project `general_context` is user-editable and can orient RAG and contradiction prompts
+    Базовая модель работы:
+    - проект объединяет документы в отдельную базу знаний;
+    - загрузка документа создаёт фоновую задачу индексации;
+    - RAG-запросы работают только по документам со статусом `indexed`;
+    - анализ противоречий запускается асинхронно и опрашивается по `job_id`.
 
 servers:
   - url: http://localhost:8080/api/v1
-    description: Local development server
+    description: Локальный backend
 
 tags:
   - name: Projects
+    description: Проекты, то есть отдельные базы знаний.
   - name: Documents
+    description: Загрузка, удаление и получение документов.
   - name: Content
+    description: Оригинальный файл и извлечённый текст.
   - name: RAG
+    description: Вопросы по проиндексированным документам проекта.
+  - name: Retrieval
+    description: Отладочный retrieval без генерации ответа LLM.
   - name: Analysis
+    description: Асинхронный поиск противоречий между документами.
 
 paths:
   /projects:
     get:
       tags: [Projects]
-      operationId: listProjects
-      summary: List projects
+      summary: Список проектов
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Limit'
       responses:
         '200':
-          description: Projects list
+          description: Проекты
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProjectListResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                $ref: '#/components/schemas/ProjectList'
     post:
       tags: [Projects]
-      operationId: createProject
-      summary: Create project
+      summary: Создать проект
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateProjectRequest'
+              $ref: '#/components/schemas/CreateProject'
       responses:
         '201':
-          description: Project created
+          description: Проект создан
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Project'
-        '400':
-          $ref: '#/components/responses/BadRequest'
         '409':
-          $ref: '#/components/responses/Conflict'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+          description: Проект с таким именем уже существует
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
-  /projects/{projectId}:
+  /projects/{project_id}:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
     get:
       tags: [Projects]
-      operationId: getProject
-      summary: Get project
+      summary: Получить проект
       responses:
         '200':
-          description: Project details
+          description: Проект
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Project'
         '404':
-          $ref: '#/components/responses/ProjectNotFound'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-    patch:
-      tags: [Projects]
-      operationId: updateProject
-      summary: Update project metadata and general context
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateProjectRequest'
-      responses:
-        '200':
-          description: Project updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Project'
-        '404':
-          $ref: '#/components/responses/ProjectNotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+          $ref: '#/components/responses/NotFound'
     delete:
       tags: [Projects]
-      operationId: deleteProject
-      summary: Delete project
+      summary: Удалить проект
       responses:
         '204':
-          description: Project deleted
+          description: Проект удалён
         '404':
-          $ref: '#/components/responses/ProjectNotFound'
+          $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/ProjectBusy'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+          description: Проект занят активными задачами
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
-  /projects/{projectId}/documents:
+  /projects/{project_id}/documents:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
     get:
       tags: [Documents]
-      operationId: listDocuments
-      summary: List documents in project
+      summary: Список документов проекта
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Limit'
       responses:
         '200':
-          description: Documents list
+          description: Документы
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DocumentListResponse'
-        '404':
-          $ref: '#/components/responses/ProjectNotFound'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                $ref: '#/components/schemas/DocumentList'
     post:
       tags: [Documents]
-      operationId: uploadDocument
-      summary: Upload document to project
+      summary: Загрузить документ
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/UploadDocumentRequest'
-            encoding:
-              file:
-                contentType: application/pdf, text/plain, text/markdown, application/vnd.openxmlformats-officedocument.wordprocessingml.document
+              type: object
+              required: [file]
+              properties:
+                display_name:
+                  type: string
+                  nullable: true
+                file:
+                  type: string
+                  format: binary
       responses:
         '201':
-          description: Document uploaded
+          description: Документ принят и поставлен в очередь индексации
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/ProjectNotFound'
-        '409':
-          $ref: '#/components/responses/ProjectReindexing'
         '413':
-          $ref: '#/components/responses/PayloadTooLarge'
+          description: Файл превышает лимит размера
         '415':
-          $ref: '#/components/responses/UnsupportedMediaType'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+          description: Формат файла не поддерживается
 
-  /projects/{projectId}/documents/{documentId}:
+  /projects/{project_id}/documents/{document_id}:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
       - $ref: '#/components/parameters/DocumentId'
     get:
       tags: [Documents]
-      operationId: getDocument
-      summary: Get document metadata
+      summary: Метаданные документа
       responses:
         '200':
-          description: Document metadata
+          description: Документ
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
         '404':
-          $ref: '#/components/responses/DocumentNotFound'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+          $ref: '#/components/responses/NotFound'
     delete:
       tags: [Documents]
-      operationId: deleteDocument
-      summary: Delete document
+      summary: Удалить документ
       responses:
         '204':
-          description: Document deleted
+          description: Документ удалён
         '404':
-          $ref: '#/components/responses/DocumentNotFound'
+          $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/DocumentBusy'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+          description: Документ занят активной задачей
 
-  /projects/{projectId}/documents/{documentId}/content:
+  /projects/{project_id}/documents/{document_id}/text:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
       - $ref: '#/components/parameters/DocumentId'
     get:
       tags: [Content]
-      operationId: getDocumentContent
-      summary: Download or render original file
+      summary: Извлечённый текст документа
       responses:
         '200':
-          description: Raw document bytes
+          description: Текст
           content:
-            application/pdf:
+            application/json:
               schema:
-                type: string
-                format: binary
-            text/plain:
-              schema:
-                type: string
-            text/markdown:
-              schema:
-                type: string
+                $ref: '#/components/schemas/DocumentText'
+        '409':
+          description: Текст ещё недоступен, индексация не завершена
+
+  /projects/{project_id}/documents/{document_id}/content:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags: [Content]
+      summary: Скачать оригинальный файл
+      responses:
+        '200':
+          description: Оригинальные байты файла
+          content:
             application/octet-stream:
               schema:
                 type: string
                 format: binary
         '404':
-          $ref: '#/components/responses/DocumentNotFound'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+          $ref: '#/components/responses/NotFound'
 
-  /projects/{projectId}/documents/{documentId}/text:
-    parameters:
-      - $ref: '#/components/parameters/ProjectId'
-      - $ref: '#/components/parameters/DocumentId'
-    get:
-      tags: [Content]
-      operationId: getDocumentText
-      summary: Get extracted text
-      responses:
-        '200':
-          description: Extracted document text
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentTextResponse'
-        '404':
-          $ref: '#/components/responses/DocumentNotFound'
-        '409':
-          description: Text is not available yet because processing is incomplete
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                processing_not_finished:
-                  value:
-                    error:
-                      code: DOCUMENT_NOT_READY
-                      message: Document text is not available yet because processing is not finished.
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-
-  /projects/{projectId}/rag/query:
+  /projects/{project_id}/rag/query:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
     post:
       tags: [RAG]
-      operationId: queryRag
-      summary: Ask question against project documents
+      summary: Задать вопрос по документам проекта
       description: |
-        Runs a synchronous RAG query within one project.
-
-        If `target_document_ids` is omitted, the backend searches across all indexed
-        documents in the project. If explicit target documents are provided and some
-        of them are not indexed yet, those documents are ignored and the response may
-        include a warning message. Unknown target document IDs are ignored.
+        Если `target_document_ids` не передан, поиск идёт по всем документам проекта
+        со статусом `indexed`.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RagQueryRequest'
+              $ref: '#/components/schemas/RagQuery'
       responses:
         '200':
-          description: RAG answer
+          description: Ответ RAG
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RagQueryResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/ProjectNotFound'
-        '409':
-          $ref: '#/components/responses/ProjectReindexing'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                $ref: '#/components/schemas/RagAnswer'
 
-  /projects/{projectId}/analysis/contradictions:
+  /projects/{project_id}/retrieval/query:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
     post:
-      tags: [Analysis]
-      operationId: startContradictionAnalysis
-      summary: Start contradiction analysis job
+      tags: [Retrieval]
+      summary: Найти Qdrant points по raw text
       description: |
-        Starts an asynchronous contradiction analysis job.
-
-        The base document must already be indexed.
-
-        If `target_document_ids` is omitted, the backend compares the base document
-        against all other indexed documents in the project. If explicit target
-        documents are provided and some of them are not indexed yet, those documents
-        are ignored and the job response may include a warning message. Unknown
-        target document IDs are ignored.
+        Endpoint векторизует переданный `text`, выполняет dense, sparse или hybrid
+        retrieval по Qdrant и возвращает структурированный список найденных points
+        без обращения к LLM. `dense_weight` и `sparse_weight` управляют участием
+        веток: оба значения больше нуля включают Qdrant prefetch + weighted RRF
+        fusion, нулевое значение отключает соответствующую ветку.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/StartContradictionAnalysisRequest'
+              $ref: '#/components/schemas/RetrievalQuery'
       responses:
-        '202':
-          description: Analysis job accepted
-          headers:
-            Location:
-              description: Absolute or relative URL of the job status resource.
-              schema:
-                type: string
+        '200':
+          description: Найденные Qdrant points
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AnalysisJobAcceptedResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/ProjectNotFound'
-        '409':
-          $ref: '#/components/responses/AnalysisStartConflict'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                $ref: '#/components/schemas/RetrievalAnswer'
 
-  /projects/{projectId}/analysis/contradictions/{jobId}:
+  /projects/{project_id}/analysis/contradictions:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Analysis]
+      summary: Список задач анализа противоречий
+      responses:
+        '200':
+          description: Задачи анализа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisJobList'
+    post:
+      tags: [Analysis]
+      summary: Запустить анализ противоречий
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartAnalysis'
+      responses:
+        '202':
+          description: Задача создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisAccepted'
+        '409':
+          description: Базовый документ не готов или проект занят
+
+  /projects/{project_id}/analysis/contradictions/{job_id}:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
       - $ref: '#/components/parameters/JobId'
     get:
       tags: [Analysis]
-      operationId: getContradictionAnalysis
-      summary: Get contradiction analysis job state and result
+      summary: Статус и результат задачи анализа
       responses:
         '200':
-          description: Analysis job details
+          description: Задача анализа
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ContradictionAnalysisResponse'
+                $ref: '#/components/schemas/AnalysisJob'
         '404':
-          $ref: '#/components/responses/AnalysisJobNotFound'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+          $ref: '#/components/responses/NotFound'
 
 components:
   parameters:
     ProjectId:
-      name: projectId
+      name: project_id
       in: path
       required: true
       schema:
-        $ref: '#/components/schemas/ProjectId'
+        type: integer
+        minimum: 1
     DocumentId:
-      name: documentId
+      name: document_id
       in: path
       required: true
       schema:
-        $ref: '#/components/schemas/DocumentId'
+        type: integer
+        minimum: 1
     JobId:
-      name: jobId
+      name: job_id
       in: path
       required: true
       schema:
-        $ref: '#/components/schemas/JobId'
+        type: integer
+        minimum: 1
     Page:
       name: page
       in: query
@@ -427,289 +342,47 @@ components:
         type: integer
         minimum: 1
         maximum: 100
-        default: 20
+        default: 10
 
   responses:
-    BadRequest:
-      description: Request is malformed
+    NotFound:
+      description: Ресурс не найден
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            bad_request:
-              value:
-                error:
-                  code: BAD_REQUEST
-                  message: Request is malformed.
-    Conflict:
-      description: Resource conflict
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            project_name_conflict:
-              value:
-                error:
-                  code: PROJECT_ALREADY_EXISTS
-                  message: Project with the same name already exists.
-    ValidationError:
-      description: Request failed business validation
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ValidationErrorResponse'
-    PayloadTooLarge:
-      description: Uploaded file is too large
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            payload_too_large:
-              value:
-                error:
-                  code: FILE_TOO_LARGE
-                  message: Uploaded file exceeds the maximum allowed size.
-    UnsupportedMediaType:
-      description: Uploaded file type is not supported
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            unsupported_media_type:
-              value:
-                error:
-                  code: UNSUPPORTED_MEDIA_TYPE
-                  message: Uploaded file type is not supported.
-    ProjectNotFound:
-      description: Project was not found
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            project_not_found:
-              value:
-                error:
-                  code: PROJECT_NOT_FOUND
-                  message: Project does not exist.
-    ProjectBusy:
-      description: Project cannot be deleted because active jobs or reindex work still reference it
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            project_has_active_jobs:
-              value:
-                error:
-                  code: PROJECT_HAS_ACTIVE_JOBS
-                  message: Project cannot be deleted while active jobs are running.
-    ProjectReindexing:
-      description: Project is temporarily unavailable because reindexing is in progress
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            project_reindexing:
-              value:
-                error:
-                  code: PROJECT_REINDEXING
-                  message: Project is temporarily unavailable because reindexing is in progress.
-    DocumentNotFound:
-      description: Document was not found in the specified project
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            document_not_found:
-              value:
-                error:
-                  code: DOCUMENT_NOT_FOUND
-                  message: Document does not exist in this project.
-    DocumentBusy:
-      description: Document cannot be deleted because active jobs still reference it or the project is reindexing
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            document_has_active_jobs:
-              value:
-                error:
-                  code: DOCUMENT_HAS_ACTIVE_JOBS
-                  message: Document cannot be deleted while active jobs are running.
-            project_reindexing:
-              value:
-                error:
-                  code: PROJECT_REINDEXING
-                  message: Project is temporarily unavailable because reindexing is in progress.
-    AnalysisJobNotFound:
-      description: Analysis job was not found
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            analysis_job_not_found:
-              value:
-                error:
-                  code: ANALYSIS_JOB_NOT_FOUND
-                  message: Analysis job does not exist in this project.
-    AnalysisStartConflict:
-      description: Contradiction analysis could not be started because the project or base document is not ready
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            base_document_not_ready:
-              value:
-                error:
-                  code: DOCUMENT_NOT_READY
-                  message: Base document is not indexed yet and cannot be used for contradiction analysis.
-            project_reindexing:
-              value:
-                error:
-                  code: PROJECT_REINDEXING
-                  message: Project is temporarily unavailable because reindexing is in progress.
-    InternalServerError:
-      description: Unexpected server error
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            internal_server_error:
-              value:
-                error:
-                  code: INTERNAL_SERVER_ERROR
-                  message: Unexpected internal server error.
+            $ref: '#/components/schemas/Error'
 
   schemas:
-    ProjectId:
-      type: integer
-      minimum: 1
-      example: 123
-
-    DocumentId:
-      type: integer
-      minimum: 1
-      example: 456
-
-    JobId:
-      type: integer
-      minimum: 1
-      example: 999
-
-    Timestamp:
-      type: string
-      format: date-time
-      example: '2026-03-15T18:15:00Z'
+    Error:
+      type: object
+      additionalProperties: true
+      properties:
+        detail:
+          type: string
 
     Project:
       type: object
-      additionalProperties: false
-      required:
-        - id
-        - name
-        - description
-        - general_context
-        - state
-        - document_count
-        - created_at
+      required: [id, name, document_count, created_at, updated_at]
       properties:
         id:
-          $ref: '#/components/schemas/ProjectId'
+          type: integer
         name:
           type: string
-          minLength: 1
-          maxLength: 200
-          example: Legal Contracts
         description:
           type: string
-          minLength: 0
-          maxLength: 2000
-          example: Contracts for review
-        general_context:
-          type: string
-          minLength: 0
-          maxLength: 20000
-          description: Editable project orientation/context used by RAG and analysis prompts.
-          example: Treat the documents as Russian corporate compliance policies for internal review.
-        state:
-          $ref: '#/components/schemas/ProjectState'
+          nullable: true
         document_count:
           type: integer
-          minimum: 0
-          example: 4
         created_at:
-          $ref: '#/components/schemas/Timestamp'
+          type: string
+          format: date-time
         updated_at:
-          $ref: '#/components/schemas/Timestamp'
+          type: string
+          format: date-time
 
-    CreateProjectRequest:
+    ProjectList:
       type: object
-      additionalProperties: false
-      required:
-        - name
-      properties:
-        name:
-          type: string
-          minLength: 1
-          maxLength: 200
-          example: Legal Contracts
-        description:
-          type: string
-          minLength: 0
-          maxLength: 2000
-          example: Contracts for review
-        general_context:
-          type: string
-          minLength: 0
-          maxLength: 20000
-          example: Use Russian legal terminology when explaining document conflicts.
-
-    UpdateProjectRequest:
-      type: object
-      additionalProperties: false
-      minProperties: 1
-      properties:
-        name:
-          type: string
-          minLength: 1
-          maxLength: 200
-        description:
-          type: string
-          minLength: 0
-          maxLength: 2000
-        general_context:
-          type: string
-          minLength: 0
-          maxLength: 20000
-
-    ProjectState:
-      type: string
-      description: Internal project lifecycle state.
-      enum:
-        - active
-        - reindexing
-        - deleting
-      example: active
-
-    ProjectListResponse:
-      type: object
-      additionalProperties: false
-      required:
-        - items
-        - total
-        - page
-        - limit
+      required: [items, total, page, limit]
       properties:
         items:
           type: array
@@ -717,108 +390,53 @@ components:
             $ref: '#/components/schemas/Project'
         total:
           type: integer
-          minimum: 0
-          example: 1
         page:
           type: integer
-          minimum: 1
-          example: 1
         limit:
           type: integer
-          minimum: 1
-          maximum: 100
-          example: 20
 
-    DocumentStatus:
-      type: string
-      description: |
-        Public document lifecycle exposed over HTTP.
-
-        `indexed` means the document is fully processed and eligible for RAG and
-        contradiction-analysis search.
-      enum:
-        - uploaded
-        - processing
-        - indexed
-        - failed
-      example: indexed
-
-    Document:
+    CreateProject:
       type: object
-      additionalProperties: false
-      required:
-        - id
-        - project_id
-        - name
-        - storage_key
-        - size_bytes
-        - mime_type
-        - sha256
-        - status
-        - summary
-        - created_at
+      required: [name]
       properties:
-        id:
-          $ref: '#/components/schemas/DocumentId'
-        project_id:
-          $ref: '#/components/schemas/ProjectId'
         name:
           type: string
           minLength: 1
-          maxLength: 255
-          example: contract.pdf
-        storage_key:
+          maxLength: 500
+        description:
           type: string
-          minLength: 1
-          maxLength: 2000
-          description: Object-storage key of the original uploaded file.
-          example: projects/123/documents/456/original.pdf
+          nullable: true
+
+    Document:
+      type: object
+      required: [id, project_id, name, size_bytes, mime_type, status, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        project_id:
+          type: integer
+        name:
+          type: string
         size_bytes:
           type: integer
-          minimum: 0
-          example: 1048576
         mime_type:
           type: string
-          minLength: 1
-          maxLength: 255
-          example: application/pdf
-        sha256:
-          type: string
-          minLength: 64
-          maxLength: 64
-          example: d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2
         status:
-          $ref: '#/components/schemas/DocumentStatus'
-        indexed_config_id:
-          type: integer
-          minimum: 1
-          nullable: true
-          description: Project index config used for the current indexed representation.
-          example: 7
+          type: string
+          enum: [uploaded, processing, indexed, failed]
         summary:
           type: string
-          minLength: 0
-          maxLength: 20000
-          description: LLM-generated document summary that can be edited by the user.
-          example: The document defines vendor onboarding, payment terms, and termination rules.
-        failure_reason:
-          type: string
-          minLength: 1
-          maxLength: 4000
           nullable: true
         created_at:
-          $ref: '#/components/schemas/Timestamp'
+          type: string
+          format: date-time
         updated_at:
-          $ref: '#/components/schemas/Timestamp'
+          type: string
+          format: date-time
 
-    DocumentListResponse:
+    DocumentList:
       type: object
-      additionalProperties: false
-      required:
-        - items
-        - total
-        - page
-        - limit
+      required: [items, total, page, limit]
       properties:
         items:
           type: array
@@ -826,362 +444,206 @@ components:
             $ref: '#/components/schemas/Document'
         total:
           type: integer
-          minimum: 0
-          example: 1
         page:
           type: integer
-          minimum: 1
-          example: 1
         limit:
           type: integer
-          minimum: 1
-          maximum: 100
-          example: 20
 
-    UploadDocumentRequest:
+    DocumentText:
       type: object
-      additionalProperties: false
-      required:
-        - file
-      properties:
-        file:
-          type: string
-          format: binary
-        display_name:
-          type: string
-          minLength: 1
-          maxLength: 255
-
-    DocumentTextResponse:
-      type: object
-      additionalProperties: false
-      required:
-        - document_id
-        - text
+      required: [document_id, text]
       properties:
         document_id:
-          $ref: '#/components/schemas/DocumentId'
+          type: integer
         text:
           type: string
-          example: Full extracted text of the document...
 
-    RagQueryRequest:
+    RagQuery:
       type: object
-      additionalProperties: false
-      required:
-        - question
+      required: [question]
       properties:
         question:
           type: string
           minLength: 1
-          maxLength: 10000
-          example: What are the termination conditions?
         target_document_ids:
-          description: |
-            Optional explicit document scope.
-
-            If omitted, all indexed documents in the project are searched. If this
-            list includes documents that are not indexed yet, those documents are
-            ignored. Unknown target document IDs are ignored.
           type: array
-          minItems: 1
-          uniqueItems: true
+          nullable: true
           items:
-            $ref: '#/components/schemas/DocumentId'
+            type: integer
 
     Citation:
       type: object
-      additionalProperties: false
-      required:
-        - document_id
-        - document_name
-        - snippet
+      required: [document_id, document_name, snippet]
       properties:
         document_id:
-          $ref: '#/components/schemas/DocumentId'
+          type: integer
         document_name:
           type: string
-          minLength: 1
-          maxLength: 255
-          example: contract.pdf
         snippet:
           type: string
-          minLength: 1
-          maxLength: 4000
-          example: Either party may terminate this agreement with 30 days written notice...
 
-    RagQueryResponse:
+    RagAnswer:
       type: object
-      additionalProperties: false
-      required:
-        - answer
-        - citations
+      required: [answer, citations]
       properties:
         answer:
           type: string
-          minLength: 1
-          example: The agreement may be terminated with 30 days written notice.
         warning_message:
           type: string
-          minLength: 1
-          maxLength: 4000
-          example: Some requested target documents were ignored because they are not indexed yet.
+          nullable: true
         citations:
           type: array
           items:
             $ref: '#/components/schemas/Citation'
 
-    AcceptedAnalysisJobStatus:
-      type: string
-      enum:
-        - queued
-        - processing
-      example: queued
-
-    AnalysisJobStatus:
-      type: string
-      enum:
-        - queued
-        - processing
-        - completed
-        - failed
-      example: queued
-
-    AnalysisJobAcceptedResponse:
+    RetrievalQuery:
       type: object
-      additionalProperties: false
-      required:
-        - job_id
-        - status
-        - poll_url
+      required: [text]
       properties:
-        job_id:
-          $ref: '#/components/schemas/JobId'
-        status:
-          $ref: '#/components/schemas/AcceptedAnalysisJobStatus'
-        poll_url:
+        text:
           type: string
           minLength: 1
-          maxLength: 2000
-          example: /api/v1/projects/123/analysis/contradictions/999
-        warning_message:
-          type: string
-          minLength: 1
-          maxLength: 4000
-          example: Some requested target documents were ignored because they are not indexed yet.
-
-    Contradiction:
-      type: object
-      additionalProperties: false
-      required:
-        - base_text
-        - target_text
-        - confidence
-        - explanation
-        - base_chunk_order
-        - target_chunk_order
-      properties:
-        base_text:
-          type: string
-          minLength: 1
-          maxLength: 4000
-          example: Payment due in 60 days
-        target_text:
-          type: string
-          minLength: 1
-          maxLength: 4000
-          example: Payment due in 30 days
-        confidence:
+        target_document_ids:
+          type: array
+          nullable: true
+          items:
+            type: integer
+        dense_weight:
           type: number
           minimum: 0
-          maximum: 1
-          example: 0.84
-        explanation:
-          type: string
-          minLength: 1
-          maxLength: 4000
-          example: Both chunks describe payment timing, but one says 60 days and the other says 30 days.
-        base_chunk_order:
-          type: integer
+          nullable: true
+        sparse_weight:
+          type: number
           minimum: 0
-          example: 4
-        target_chunk_order:
+          nullable: true
+        limit:
           type: integer
-          minimum: 0
-          example: 2
+          minimum: 1
+          maximum: 100
+          nullable: true
+        include_text:
+          type: boolean
+          default: true
+        include_payload:
+          type: boolean
+          default: true
 
-    ContradictionResult:
+    RetrievalPoint:
       type: object
-      additionalProperties: false
-      required:
-        - target_document_id
-        - target_document_name
-        - summary
-        - contradictions
+      required: [point_id]
       properties:
-        target_document_id:
-          $ref: '#/components/schemas/DocumentId'
-        target_document_name:
+        point_id:
           type: string
-          minLength: 1
-          maxLength: 255
-          example: supplier-terms.pdf
-        summary:
+        score:
+          type: number
+          nullable: true
+        distance:
+          type: number
+          nullable: true
+        document_id:
+          type: integer
+          nullable: true
+        chunk_id:
+          type: integer
+          nullable: true
+        chunk_order:
+          type: integer
+          nullable: true
+        char_start:
+          type: integer
+          nullable: true
+        char_end:
+          type: integer
+          nullable: true
+        text_preview:
           type: string
-          minLength: 1
-          maxLength: 4000
-          example: The target document conflicts with the base document on payment timing and notice periods.
-        contradictions:
+          nullable: true
+        text:
+          type: string
+          nullable: true
+        payload:
+          type: object
+          nullable: true
+          additionalProperties: true
+
+    RetrievalAnswer:
+      type: object
+      required: [query_text, collection_name, retrieval_mode, dense_weight, sparse_weight, sparse_vector_enabled, limit, points]
+      properties:
+        query_text:
+          type: string
+        collection_name:
+          type: string
+        retrieval_mode:
+          type: string
+          enum: [dense, sparse, hybrid]
+        dense_weight:
+          type: number
+        sparse_weight:
+          type: number
+        sparse_vector_enabled:
+          type: boolean
+        limit:
+          type: integer
+        points:
           type: array
           items:
-            $ref: '#/components/schemas/Contradiction'
+            $ref: '#/components/schemas/RetrievalPoint'
 
-    StartContradictionAnalysisRequest:
+    StartAnalysis:
       type: object
-      additionalProperties: false
-      required:
-        - base_document_id
+      required: [base_document_id]
       properties:
         base_document_id:
-          $ref: '#/components/schemas/DocumentId'
+          type: integer
+          minimum: 1
         target_document_ids:
-          description: |
-            Optional explicit comparison scope.
-
-            If omitted, the backend compares the base document against all other
-            indexed documents in the project. If this list includes documents that
-            are not indexed yet, those documents are ignored. Unknown target
-            document IDs are ignored.
           type: array
-          minItems: 1
-          uniqueItems: true
+          nullable: true
           items:
-            $ref: '#/components/schemas/DocumentId'
+            type: integer
 
-    ContradictionAnalysisPendingResponse:
+    AnalysisAccepted:
       type: object
-      additionalProperties: false
-      required:
-        - job_id
-        - status
+      required: [job_id, status, poll_url]
       properties:
         job_id:
-          $ref: '#/components/schemas/JobId'
+          type: integer
         status:
-          $ref: '#/components/schemas/AcceptedAnalysisJobStatus'
+          type: string
+        poll_url:
+          type: string
         warning_message:
           type: string
-          minLength: 1
-          maxLength: 4000
+          nullable: true
 
-    CompletedContradictionAnalysisResponse:
+    AnalysisJob:
       type: object
-      additionalProperties: false
-      required:
-        - job_id
-        - status
-        - results
+      required: [job_id, status]
       properties:
         job_id:
-          $ref: '#/components/schemas/JobId'
+          type: integer
         status:
           type: string
-          const: completed
+          enum: [queued, processing, completed, failed]
+        poll_url:
+          type: string
+          nullable: true
         warning_message:
           type: string
-          minLength: 1
-          maxLength: 4000
+          nullable: true
         results:
-          description: Ranked contradiction results by target document.
-          type: array
-          items:
-            $ref: '#/components/schemas/ContradictionResult'
-
-    FailedContradictionAnalysisResponse:
-      type: object
-      additionalProperties: false
-      required:
-        - job_id
-        - status
-        - error_message
-      properties:
-        job_id:
-          $ref: '#/components/schemas/JobId'
-        status:
-          type: string
-          const: failed
-        warning_message:
-          type: string
-          minLength: 1
-          maxLength: 4000
+          nullable: true
         error_message:
-          description: Human-readable explanation of why the analysis job failed.
           type: string
-          minLength: 1
-          maxLength: 4000
+          nullable: true
 
-    ContradictionAnalysisResponse:
-      oneOf:
-        - $ref: '#/components/schemas/ContradictionAnalysisPendingResponse'
-        - $ref: '#/components/schemas/CompletedContradictionAnalysisResponse'
-        - $ref: '#/components/schemas/FailedContradictionAnalysisResponse'
-
-    ErrorDetail:
+    AnalysisJobList:
       type: object
-      additionalProperties: false
-      required:
-        - code
-        - message
+      required: [items]
       properties:
-        code:
-          type: string
-          minLength: 1
-          maxLength: 128
-          example: DOCUMENT_NOT_FOUND
-        message:
-          type: string
-          minLength: 1
-          maxLength: 4000
-          example: Document does not exist in this project.
-
-    ErrorResponse:
-      type: object
-      additionalProperties: false
-      required:
-        - error
-      properties:
-        error:
-          $ref: '#/components/schemas/ErrorDetail'
-
-    ValidationIssue:
-      type: object
-      additionalProperties: false
-      required:
-        - field
-        - message
-      properties:
-        field:
-          type: string
-          minLength: 1
-          maxLength: 255
-          example: name
-        message:
-          type: string
-          minLength: 1
-          maxLength: 1000
-          example: must not be empty
-
-    ValidationErrorResponse:
-      type: object
-      additionalProperties: false
-      required:
-        - error
-        - issues
-      properties:
-        error:
-          $ref: '#/components/schemas/ErrorDetail'
-        issues:
+        items:
           type: array
-          minItems: 1
           items:
-            $ref: '#/components/schemas/ValidationIssue'
+            type: object
+            additionalProperties: true

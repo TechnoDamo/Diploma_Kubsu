@@ -1,6 +1,7 @@
 import asyncio
 import json
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Optional
 
@@ -12,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import Settings
 from app.infra.llm import LLMClient
 from app.infra.qdrant import QdrantRepository
-from app.support.text import clip_snippet
+from app.support.sparse import generate_sparse_vectors
 
 logger = structlog.get_logger(__name__)
 
@@ -76,29 +77,87 @@ class AnalysisService:
             "warning_message": None,
         }
 
+    async def list_jobs(
+        self,
+        project_id: int,
+        status: Optional[str] = None,
+    ) -> list[dict]:
+        """List all contradiction analysis jobs for a project."""
+        where_clause = "j.project_id = :pid"
+        params = {"pid": project_id}
+
+        if status:
+            where_clause += " AND j.status = :status"
+            params["status"] = status
+
+        r = await self._db.execute(
+            text(f"""
+                SELECT j.id, j.project_id, j.base_document_id, j.status,
+                       j.created_at, j.updated_at, j.completed_at, j.warning_message,
+                       j.results
+                FROM analysis.analysis_jobs j
+                WHERE {where_clause}
+                ORDER BY j.created_at DESC
+            """),
+            params,
+        )
+
+        result = []
+        for row in r.fetchall():
+            targets_r = await self._db.execute(
+                text("SELECT document_id FROM analysis.analysis_job_targets WHERE job_id = :jid"),
+                {"jid": row.id},
+            )
+            target_ids = [t.document_id for t in targets_r.fetchall()]
+
+            result.append({
+                "id": row.id,
+                "project_id": row.project_id,
+                "base_document_id": row.base_document_id,
+                "target_document_ids": target_ids,
+                "status": row.status,
+                "created_at": row.created_at.isoformat() if row.created_at else "",
+                "updated_at": row.updated_at.isoformat() if row.updated_at else "",
+                "completed_at": row.completed_at.isoformat() if row.completed_at else None,
+                "warning_message": row.warning_message,
+                "results": row.results,
+            })
+
+        return result
+
     async def get_job(self, project_id: int, job_id: int) -> Optional[dict]:
         r = await self._db.execute(
             text("""
-                SELECT id, project_id, base_document_id, status,
-                       warning_message, error_message, results,
-                       created_at, updated_at, completed_at
-                FROM analysis.analysis_jobs
-                WHERE id = :jid AND project_id = :pid
+                SELECT j.id, j.project_id, j.base_document_id, j.status,
+                       j.created_at, j.updated_at, j.completed_at,
+                       j.warning_message, j.error_message, j.results
+                FROM analysis.analysis_jobs j
+                WHERE j.id = :jid AND j.project_id = :pid
             """),
             {"jid": job_id, "pid": project_id},
         )
         row = r.first()
         if not row:
             return None
-
         return {
             "job_id": row.id,
             "status": row.status,
-            "poll_url": f"/api/v1/projects/{project_id}/analysis/contradictions/{row.id}",
+            "poll_url": f"/api/v1/projects/{project_id}/analysis/contradictions/{job_id}",
             "warning_message": row.warning_message,
-            "results": row.results if row.status == "completed" else None,
-            "error_message": row.error_message if row.status == "failed" else None,
+            "error_message": row.error_message,
+            "results": row.results,
         }
+
+    async def delete_job(self, project_id: int, job_id: int) -> None:
+        await self._db.execute(
+            text("DELETE FROM analysis.analysis_job_targets WHERE job_id = :jid"),
+            {"jid": job_id},
+        )
+        await self._db.execute(
+            text("DELETE FROM analysis.analysis_jobs WHERE id = :jid AND project_id = :pid"),
+            {"jid": job_id, "pid": project_id},
+        )
+        await self._db.commit()
 
     async def process_next_job(self) -> Optional[int]:
         result = await self._db.execute(
@@ -134,16 +193,20 @@ class AnalysisService:
             await self._process_job(job_id, project_id, base_doc_id)
         except Exception as e:
             logger.error("analysis_job_failed", job_id=job_id, project_id=project_id, error=str(e), exc_info=e)
-            await self._db.execute(
-                text("""
-                    UPDATE analysis.analysis_jobs
-                    SET status = 'failed', completed_at = CURRENT_TIMESTAMP,
-                        error_message = :err, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = :jid
-                """),
-                {"jid": job_id, "err": str(e)},
-            )
-            await self._db.commit()
+            try:
+                await self._db.rollback()
+                await self._db.execute(
+                    text("""
+                        UPDATE analysis.analysis_jobs
+                        SET status = 'failed', completed_at = CURRENT_TIMESTAMP,
+                            error_message = :err, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = :jid
+                    """),
+                    {"jid": job_id, "err": str(e)[:1000]},
+                )
+                await self._db.commit()
+            except Exception:
+                pass
             return job_id
 
         await self._db.commit()
@@ -175,8 +238,16 @@ class AnalysisService:
             cfg.contradiction_max_distance
             or self._settings.contradiction_max_distance
         )
-        dense_weight = cfg.contradiction_dense_weight or self._settings.contradiction_dense_weight
-        sparse_weight = cfg.contradiction_sparse_weight or self._settings.contradiction_sparse_weight
+        dense_weight = (
+            cfg.contradiction_dense_weight
+            if cfg.contradiction_dense_weight is not None
+            else self._settings.contradiction_dense_weight
+        )
+        sparse_weight = (
+            cfg.contradiction_sparse_weight
+            if cfg.contradiction_sparse_weight is not None
+            else self._settings.contradiction_sparse_weight
+        )
 
         target_ids = await self._resolve_targets(job_id, project_id, base_doc_id)
 
@@ -277,7 +348,7 @@ class AnalysisService:
             text("""
                 UPDATE analysis.analysis_jobs
                 SET status = 'completed', completed_at = CURRENT_TIMESTAMP,
-                    results = :results::jsonb, updated_at = CURRENT_TIMESTAMP
+                    results = :results, updated_at = CURRENT_TIMESTAMP
                 WHERE id = :jid
             """),
             {"jid": job_id, "results": json.dumps(results_summary, ensure_ascii=False)},
@@ -334,7 +405,12 @@ class AnalysisService:
             {"did": base_doc_id},
         )
         base_chunks = [
-            {"id": r.id, "point_id": str(r.qdrant_point_id), "order": r.chunk_order, "text": r.text}
+            {
+                "id": r.id,
+                "point_id": uuid.UUID(str(r.qdrant_point_id)),
+                "order": r.chunk_order,
+                "text": r.text,
+            }
             for r in base_chunks_r
         ]
 
@@ -349,20 +425,33 @@ class AnalysisService:
 
         candidates = []
         for bc in base_chunks:
+            sparse_vec = None
+            if self._settings.sparse_vector_enabled and sparse_weight > 0:
+                sparse_vectors = generate_sparse_vectors([bc["text"]])
+                sparse_vec = sparse_vectors[0] if sparse_vectors else None
             try:
-                results = await self._qdrant._client.recommend(
+                result_points = await self._qdrant.search_similar_hybrid_by_point(
                     collection_name=collection_name,
-                    positive=[bc["point_id"]],
+                    positive_point_id=bc["point_id"],
+                    sparse_vector=sparse_vec,
+                    dense_weight=dense_weight,
+                    sparse_weight=sparse_weight,
                     limit=top_k,
-                    query_filter=target_filter,
-                    score_threshold=max_dist,
-                    with_payload=True,
+                    max_distance=max_dist,
+                    filter_condition=target_filter,
                 )
-            except Exception:
+            except Exception as e:
+                logger.warning(
+                    "contradiction_candidate_retrieval_failed",
+                    base_document_id=base_doc_id,
+                    target_document_id=target_doc_id,
+                    base_chunk_order=bc["order"],
+                    error=str(e),
+                )
                 continue
 
-            for r in results:
-                payload = r.payload or {}
+            for r in result_points:
+                payload = r.get("payload", {})
                 candidates.append({
                     "target_document_id": target_doc_id,
                     "target_document_name": target_name,
@@ -370,7 +459,12 @@ class AnalysisService:
                     "target_order": payload.get("chunk_order", 0),
                     "base_text": bc["text"],
                     "target_text": payload.get("text", ""),
-                    "distance": 1.0 - r.score if r.score else 1.0,
+                    "distance": r.get("distance", 1.0),
+                    "score": r.get("score", 0.0),
+                    "dense_score": r.get("dense_score"),
+                    "sparse_score": r.get("sparse_score"),
+                    "dense_score_raw": r.get("dense_score_raw"),
+                    "sparse_score_raw": r.get("sparse_score_raw"),
                 })
 
         candidates.sort(key=lambda c: c["distance"])

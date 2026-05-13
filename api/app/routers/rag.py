@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import get_db, get_rag_service
+from app.dependencies import get_rag_service
 from app.schemas.rag import RagQueryIn, RagQueryOut
 from app.services.rag import RAGService
 

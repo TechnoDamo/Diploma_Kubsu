@@ -98,6 +98,8 @@ type ContradictionJob = {
   createdAt: string;
   updatedAt: string;
   result?: {
+    target_document_id: number;
+    target_document_name: string;
     summary: string;
     contradictions: {
       base_text: string;
@@ -107,7 +109,7 @@ type ContradictionJob = {
       base_chunk_order: number;
       target_chunk_order: number;
     }[];
-  };
+  }[];
   error?: string;
 };
 
@@ -544,6 +546,7 @@ export default function HomePage() {
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [contradictionJobs, setContradictionJobs] = useState<ContradictionJob[]>([]);
+  const [expandedJobId, setExpandedJobId] = useState<number | null>(null);
   const [contradictionBaseDocId, setContradictionBaseDocId] = useState<number | null>(null);
   const [contradictionTargetDocIds, setContradictionTargetDocIds] = useState<number[]>([]);
   const [isRunningAnalysis, setIsRunningAnalysis] = useState(false);
@@ -735,6 +738,46 @@ export default function HomePage() {
 
     return () => window.clearInterval(tick);
   }, [uploadBatchProgress?.active]);
+
+  useEffect(() => {
+    if (rightPanelView !== 'contradiction' || !projectId) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await ragApi.listAnalysisJobs(projectId);
+        if (cancelled) return;
+        const jobs: ContradictionJob[] = res.items.map((item: any) => ({
+          id: item.id,
+          status: item.status as ContradictionJob['status'],
+          baseDocumentId: item.base_document_id,
+          targetDocumentIds: item.target_document_ids || [],
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+          result: item.results
+        }));
+        setContradictionJobs(jobs);
+      } catch {}
+    };
+    load();
+    const poll = window.setInterval(async () => {
+      if (!projectId) return;
+      try {
+        const res = await ragApi.listAnalysisJobs(projectId);
+        if (cancelled) return;
+        const jobs: ContradictionJob[] = res.items.map((item: any) => ({
+          id: item.id,
+          status: item.status as ContradictionJob['status'],
+          baseDocumentId: item.base_document_id,
+          targetDocumentIds: item.target_document_ids || [],
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+          result: item.results
+        }));
+        setContradictionJobs(jobs);
+      } catch {}
+    }, 5000);
+    return () => { cancelled = true; window.clearInterval(poll); };
+  }, [rightPanelView, projectId]);
 
   useEffect(() => {
     setUploadBlockedUntil(readStoredNumber(STORAGE_KEYS.uploadBlockedUntil));
@@ -2222,63 +2265,92 @@ export default function HomePage() {
         ) : (
           <ul className="space-y-4">
             {contradictionJobs.map((job) => (
-              <li key={job.id} className="rounded-xl border border-[var(--line)] p-4 bg-[var(--bg)]/60">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Задача #{job.id}</span>
-                  <span className={`rounded-full px-2 py-1 text-xs ${
-                    job.status === 'queued' ? 'bg-blue-500/20 text-blue-300' :
-                    job.status === 'processing' ? 'bg-yellow-500/20 text-yellow-300' :
-                    job.status === 'completed' ? 'bg-green-500/20 text-green-300' :
-                    'bg-red-500/20 text-red-300'
-                  }`}>
-                    {job.status === 'queued' ? 'Ожидает' :
-                     job.status === 'processing' ? 'В обработке' :
-                     job.status === 'completed' ? 'Завершена' :
-                     'Ошибка'}
-                  </span>
-                </div>
-                <div className="mt-3 space-y-2">
-                  <div>
-                    <span className="text-sm text-[var(--muted)]">Основной документ: </span>
-                    <span className="font-medium">{documents.find(d => d.id === job.baseDocumentId)?.name || 'Неизвестно'}</span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-[var(--muted)]">Целевые документы: </span>
-                    <span className="font-medium">
-                      {job.targetDocumentIds.length === 0 ? 'Нет' : 
-                       job.targetDocumentIds.map(id => documents.find(d => d.id === id)?.name || id).join(', ')}
+              <li key={job.id} className="rounded-xl border border-[var(--line)] bg-[var(--bg)]/60">
+                <div className="flex w-full items-center justify-between p-4">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedJobId(expandedJobId === job.id ? null : job.id)}
+                    className="flex items-center gap-3 min-w-0 text-left flex-1"
+                  >
+                    <span className={`transition-transform shrink-0 ${expandedJobId === job.id ? 'rotate-90' : ''}`}>▶</span>
+                    <span className="font-medium truncate">Задача #{job.id}</span>
+                    <span className="text-sm text-[var(--muted)] shrink-0">
+                      {documents.find(d => d.id === job.baseDocumentId)?.name || 'Неизвестно'}
                     </span>
+                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`rounded-full px-2 py-1 text-xs ${
+                      job.status === 'queued' ? 'bg-blue-500/20 text-blue-300' :
+                      job.status === 'processing' ? 'bg-yellow-500/20 text-yellow-300' :
+                      job.status === 'completed' ? 'bg-green-500/20 text-green-300' :
+                      'bg-red-500/20 text-red-300'
+                    }`}>
+                      {job.status === 'queued' ? 'Ожидает' :
+                       job.status === 'processing' ? 'В обработке' :
+                       job.status === 'completed' ? 'Завершена' :
+                       'Ошибка'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!projectId) return;
+                        try {
+                          await ragApi.deleteAnalysisJob(projectId, job.id);
+                          setContradictionJobs(prev => prev.filter(j => j.id !== job.id));
+                        } catch {}
+                      }}
+                      className="text-gray-500 hover:text-red-400 transition p-1 shrink-0"
+                      title="Удалить"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                    </button>
                   </div>
-                  {job.status === 'completed' && job.result && (
-                    <div className="mt-4 border-t border-[var(--line)] pt-4">
-                      <p className="mb-2 text-sm">{job.result.summary}</p>
-                      <p className="text-sm font-medium mb-2">Противоречия:</p>
-                      <ul className="space-y-2">
-                        {job.result.contradictions.map((c, idx) => (
-                          <li key={idx} className="border-l-2 border-l-amber-400 pl-3 text-sm">
-                            <p><strong>Основа:</strong> {c.base_text}</p>
-                            <p className="mt-1"><strong>Цель:</strong> {c.target_text}</p>
-                            <p className="mt-1 text-xs text-[var(--muted)]">
-                              Уверенность: {(c.confidence * 100).toFixed(1)}%
-                            </p>
-                            <p className="mt-1 text-xs text-[var(--muted)]">{c.explanation}</p>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {job.status === 'failed' && job.error && (
-                    <div className="mt-4 rounded-lg bg-red-500/10 border border-red-500/25 px-3 py-2 text-sm text-red-300">
-                      Ошибка: {job.error}
-                    </div>
-                  )}
-                  {job.status === 'processing' && (
-                    <div className="mt-2 flex items-center text-sm text-[var(--muted)]">
-                      <Loader2 size={14} className="mr-1 animate-spin" />
-                      Обработка задачи...
-                    </div>
-                  )}
                 </div>
+                {expandedJobId === job.id && (
+                  <div className="px-4 pb-4 border-t border-[var(--line)] pt-3 space-y-3">
+                    <div>
+                      <span className="text-xs text-[var(--muted)]">Сравнение: </span>
+                      <span className="text-sm">
+                        {job.targetDocumentIds.map(id => documents.find(d => d.id === id)?.name || id).join(', ') || 'Нет'}
+                      </span>
+                    </div>
+                    {job.status === 'completed' && job.result && (
+                      <div className="space-y-3">
+                        {job.result.map((group: any, gi: number) => (
+                          <div key={gi} className="rounded-lg border border-[var(--line)] p-3">
+                            <div className="text-sm font-medium mb-2 text-amber-200">
+                              {group.target_document_name || group.targetName || `Документ #${group.target_document_id}`}
+                            </div>
+                            {group.summary && (
+                              <p className="text-xs text-[var(--muted)] mb-2 leading-relaxed">{group.summary}</p>
+                            )}
+                            {group.contradictions?.map((c: any, ci: number) => (
+                              <div key={ci} className="mt-2 border-l-2 border-l-amber-400 pl-3 text-xs space-y-1">
+                                <p className="text-[var(--text)] opacity-80">База: {c.base_text}</p>
+                                <p className="text-[var(--text)] opacity-80">Цель: {c.target_text}</p>
+                                <p className="text-[var(--muted)]">{(c.confidence * 100).toFixed(0)}% — {c.explanation}</p>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {job.status === 'completed' && !job.result && (
+                      <p className="text-sm text-[var(--muted)]">Противоречий не найдено.</p>
+                    )}
+                    {job.status === 'processing' && (
+                      <div className="flex items-center text-sm text-[var(--muted)]">
+                        <Loader2 size={14} className="mr-1 animate-spin" />
+                        Обработка задачи...
+                      </div>
+                    )}
+                    {job.status === 'failed' && (
+                      <div className="rounded-lg bg-red-500/10 border border-red-500/25 px-3 py-2 text-sm text-red-300">
+                        Ошибка выполнения
+                      </div>
+                    )}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -2315,7 +2387,7 @@ export default function HomePage() {
 
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold tracking-[0.18em] text-[var(--text)]/90 uppercase">
-                    RUG Agent
+                    {process.env.NEXT_PUBLIC_APP_BRAND_NAME || 'RUG Agent'}
                   </p>
                   <p className="truncate text-sm text-[var(--muted)]">Задавай вопросы по документам</p>
                 </div>

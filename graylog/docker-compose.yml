@@ -6,7 +6,7 @@ services:
     volumes:
       - graylog_mongodb_data:/data/db
     networks:
-      - graylog
+      - mimir
 
   elasticsearch:
     profiles: ["local-graylog"]
@@ -19,7 +19,7 @@ services:
     volumes:
       - graylog_es_data:/usr/share/elasticsearch/data
     networks:
-      - graylog
+      - mimir
 
   graylog:
     profiles: ["local-graylog"]
@@ -40,7 +40,6 @@ services:
       - mongodb
       - elasticsearch
     networks:
-      - graylog
       - mimir
 
   graylog-init:
@@ -69,14 +68,14 @@ services:
     depends_on:
       - graylog
     restart: "no"
+    networks:
+      - mimir
 
 volumes:
   graylog_mongodb_data:
   graylog_es_data:
 
 networks:
-  graylog:
-    driver: bridge
   mimir:
     name: mimir
     driver: bridge

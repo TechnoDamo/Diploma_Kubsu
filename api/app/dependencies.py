@@ -51,6 +51,14 @@ async def get_db() -> AsyncIterator[AsyncSession]:
         yield session
 
 
+async def get_persistent_db() -> AsyncSession:
+    global _session_factory
+    if _session_factory is None:
+        engine = await get_engine()
+        _session_factory = create_session_factory(engine)
+    return _session_factory()
+
+
 async def get_file_storage() -> FileStorage:
     return FileStorage(get_settings().files_root_dir)
 
@@ -62,7 +70,7 @@ async def get_docling_client() -> DoclingClient:
 async def get_tei_client() -> TEIClient:
     s = get_settings()
     return TEIClient(
-        s.tei_base_url, s.tei_http_timeout, s.embedding_api_key, s.embedding_model,
+        s.tei_base_url, s.tei_http_timeout, s.embedding_api_key,
         s.embedding_api_type, s.embedding_max_retries, s.embedding_retry_delay,
     )
 

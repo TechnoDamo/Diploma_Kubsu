@@ -2,12 +2,13 @@ import asyncio
 import signal
 
 import structlog
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import (
-    get_db,
     get_docling_client,
     get_file_storage,
     get_llm_client,
+    get_persistent_db,
     get_qdrant_repo,
     get_settings,
     get_tei_client,
@@ -22,10 +23,12 @@ logger = structlog.get_logger(__name__)
 class Worker:
     def __init__(
         self,
+        db: AsyncSession,
         indexing_service: IndexingService,
         analysis_service: AnalysisService,
         poll_interval: int = 3,
     ):
+        self._db = db
         self._indexing = indexing_service
         self._analysis = analysis_service
         self._poll_interval = poll_interval
@@ -40,6 +43,7 @@ class Worker:
                     logger.info("Document job processed", job_id=doc_job)
             except Exception as e:
                 logger.error("Document processing pass failed", exc_info=e)
+                await self._db.rollback()
 
             try:
                 analysis_job = await self._analysis.process_next_job()
@@ -47,6 +51,7 @@ class Worker:
                     logger.info("Analysis job processed", job_id=analysis_job)
             except Exception as e:
                 logger.error("Analysis pass failed", exc_info=e)
+                await self._db.rollback()
 
             await asyncio.sleep(self._poll_interval)
 
@@ -66,21 +71,19 @@ async def main():
         graylog_port=settings.graylog_port,
     )
 
-    async for db in get_db():
-        storage = await get_file_storage()
-        docling = await get_docling_client()
-        tei = await get_tei_client()
-        qdrant = await get_qdrant_repo()
-        llm = await get_llm_client()
+    db = await get_persistent_db()
 
-        indexing = IndexingService(db, storage, docling, tei, qdrant, llm, settings)
+    storage = await get_file_storage()
+    docling = await get_docling_client()
+    tei = await get_tei_client()
+    qdrant = await get_qdrant_repo()
+    llm = await get_llm_client()
 
-    async for db in get_db():
-        llm = await get_llm_client()
-        qdrant = await get_qdrant_repo()
-        analysis = AnalysisService(db, llm, qdrant, settings)
+    indexing = IndexingService(db, storage, docling, tei, qdrant, llm, settings)
+    analysis = AnalysisService(db, llm, qdrant, settings)
 
     worker = Worker(
+        db=db,
         indexing_service=indexing,
         analysis_service=analysis,
         poll_interval=settings.worker_poll_interval,

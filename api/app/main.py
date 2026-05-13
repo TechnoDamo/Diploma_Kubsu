@@ -1,4 +1,3 @@
-import logging
 import traceback
 
 import structlog
@@ -9,7 +8,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import Settings
-from app.routers import analysis, documents, health, projects, rag
+from app.routers import analysis, documents, health, projects, rag, retrieval
 from app.support.logging import setup_logging
 
 settings = Settings()
@@ -24,15 +23,15 @@ setup_logging(
 logger = structlog.get_logger(__name__)
 
 app = FastAPI(
-    title="Mimir RAG API",
+    title="Прототип рекомендательной системы с использованием большой языковой модели и векторного поиска",
     version="1.0.0",
     description="Интеллектуальная RAG-система с кросс-документным анализом противоречий",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_allow_origins.split(","),
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -119,4 +118,5 @@ app.include_router(health.router)
 app.include_router(projects.router)
 app.include_router(documents.router)
 app.include_router(rag.router)
+app.include_router(retrieval.router)
 app.include_router(analysis.router)

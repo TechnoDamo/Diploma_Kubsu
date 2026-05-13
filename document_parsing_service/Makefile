@@ -1,7 +1,7 @@
 .PHONY: up down
 
 up:
-	docker compose up -d --wait
+	docker compose --profile local-docling up -d
 
 down:
-	docker compose down
+	docker compose --profile local-docling down

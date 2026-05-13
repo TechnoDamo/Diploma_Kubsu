@@ -102,4 +102,96 @@ curl -fsS -X POST "http://localhost:8080/api/v1/projects/1/analysis/contradictio
 
 # Poll contradiction analysis job 1 for project 1
 curl -fsS "http://localhost:8080/api/v1/projects/1/analysis/contradictions/1"
+
+###############################################################################
+# Retrieval debug endpoint
+#
+# Vectorizes raw text, queries Qdrant, and returns structured points without LLM.
+###############################################################################
+
+# Hybrid retrieval through the API. Set sparse_weight=0 for dense-only or
+# dense_weight=0 for sparse-only.
+curl -fsS -X POST "http://localhost:8080/api/v1/projects/166/retrieval/query" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "text": "срок выплаты заработной платы",
+    "target_document_ids": [381],
+    "dense_weight": 0.7,
+    "sparse_weight": 0.3,
+    "limit": 5,
+    "include_text": true,
+    "include_payload": true
+  }'
+
+###############################################################################
+# Direct Qdrant retrieval checks
+#
+# These examples are useful when debugging retrieval outside the API.
+# Replace collection/project/document/point/vector values with real ones.
+# The API reads RAG_DENSE_WEIGHT/RAG_SPARSE_WEIGHT and
+# CONTRADICTION_DENSE_WEIGHT/CONTRADICTION_SPARSE_WEIGHT to decide which
+# retrieval branches participate. With both branches enabled, Mimir uses
+# Qdrant query_points prefetch + weighted RRF fusion.
+###############################################################################
+
+# Scroll points for a document. Existing collections may only have chunk_id order.
+curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/scroll" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "filter": {
+      "must": [
+        {"key": "project_id", "match": {"value": 166}},
+        {"key": "document_id", "match": {"value": 379}}
+      ]
+    },
+    "order_by": {"key": "chunk_id", "direction": "asc"},
+    "limit": 5,
+    "with_payload": true,
+    "with_vector": true
+  }'
+
+# Dense recommend search from an existing point id into a target document.
+curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/query" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": {"recommend": {"positive": ["POINT_ID"]}},
+    "using": "dense",
+    "filter": {"must": [{"key": "document_id", "match": {"value": 381}}]},
+    "limit": 5,
+    "with_payload": true
+  }'
+
+# Sparse search. Use real indices/values from a generated BM25 sparse vector.
+curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/query" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": {"indices": [100, 200], "values": [1.0, 0.7]},
+    "using": "sparse",
+    "filter": {"must": [{"key": "document_id", "match": {"value": 381}}]},
+    "limit": 5,
+    "with_payload": true
+  }'
+
+# Raw Qdrant hybrid fusion. This mirrors Mimir's hybrid backend path when both
+# dense and sparse branches are enabled. Requires Qdrant 1.17.0+.
+curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/query" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "prefetch": [
+      {
+        "query": {"recommend": {"positive": ["POINT_ID"]}},
+        "using": "dense",
+        "limit": 20
+      },
+      {
+        "query": {"indices": [100, 200], "values": [1.0, 0.7]},
+        "using": "sparse",
+        "limit": 20
+      }
+    ],
+    "query": {"rrf": {"weights": [0.7, 0.3]}},
+    "filter": {"must": [{"key": "document_id", "match": {"value": 381}}]},
+    "limit": 5,
+    "with_payload": true
+  }'
 EOF

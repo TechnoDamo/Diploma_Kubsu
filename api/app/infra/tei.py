@@ -1,10 +1,9 @@
-import logging
-
+import structlog
 import httpx
 
 from app.support.retry import retry_call
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class TEIClient:
@@ -13,7 +12,6 @@ class TEIClient:
         base_url: str,
         timeout: int = 180,
         api_key: str = "",
-        model: str = "",
         api_type: str = "tei",
         max_retries: int = 3,
         retry_delay: int = 5,
@@ -21,22 +19,25 @@ class TEIClient:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._api_key = api_key
-        self._model = model
         self._api_type = api_type
         self._max_retries = max_retries
         self._retry_delay = retry_delay
 
-    async def embed(self, texts: list[str], dimension: int) -> list[list[float]]:
+    async def embed(self, texts: list[str], dimension: int, model: str) -> list[list[float]]:
+        logger.info(
+            "Embedding request: url=%s, api_type=%s, model=%s, dimension=%d, texts=%d",
+            self._base_url, self._api_type, model, dimension, len(texts),
+        )
         if self._api_type == "openai_compatible":
-            return await self._embed_openai(texts, dimension)
+            return await self._embed_openai(texts, dimension, model)
         return await self._embed_tei(texts, dimension)
 
-    async def _embed_openai(self, texts: list[str], dimension: int) -> list[list[float]]:
+    async def _embed_openai(self, texts: list[str], dimension: int, model: str) -> list[list[float]]:
         async def _request():
             headers = {"Content-Type": "application/json"}
             if self._api_key:
                 headers["Authorization"] = f"Bearer {self._api_key}"
-            payload = {"input": texts, "model": self._model}
+            payload = {"input": texts, "model": model, "dimensions": dimension}
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 resp = await client.post(
                     f"{self._base_url}/embeddings",
@@ -60,9 +61,9 @@ class TEIClient:
     async def check_availability(self) -> bool:
         try:
             if self._api_type == "openai_compatible":
-                result = await self._embed_openai(["healthcheck"], 384)
+                result = await self._embed_openai(["healthcheck"], 128, "test")
             else:
-                result = await self._embed_tei(["healthcheck"], 384)
+                result = await self._embed_tei(["healthcheck"], 128)
             return len(result) == 1
         except Exception:
             return False

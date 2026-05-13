@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     http_host: str = "0.0.0.0"
     http_port: int = 8080
     http_public_base_url: str = "http://localhost:8080"
-    http_read_timeout: int = 15
+    http_read_timeout: int = 600
     http_write_timeout: int = 180
     http_idle_timeout: int = 60
     cors_allow_origins: str = "*"
@@ -36,12 +36,6 @@ class Settings(BaseSettings):
     docling_timeout_seconds: int = 300
     use_docling: bool = True
 
-    embedding_api_type: str = "openai_compatible"
-    tei_base_url: str = "http://localhost:8080"
-    tei_http_timeout: int = 180
-    tei_embed_batch_size: int = 16
-    max_embedding_concurrent_requests: int = 2
-
     object_storage_provider: str = "local"
     minio_endpoint: str = "http://minio:9000"
     minio_root_user: str = "minioadmin"
@@ -63,14 +57,17 @@ class Settings(BaseSettings):
 
     embedding_base_url: str = "https://routerai.ru/api/v1"
     embedding_api_key: str = ""
-    embedding_model: str = "minishlab/potion-base-32M"
-    embedding_vector_size: int = 256
     embedding_api_type: str = "openai_compatible"
     embedding_batch_size: int = 32
     embedding_timeout_seconds: int = 30
     embedding_pooling: str = "mean"
     embedding_max_retries: int = 3
     embedding_retry_delay: int = 5
+
+    tei_base_url: str = "http://localhost:8080"
+    tei_http_timeout: int = 180
+    tei_embed_batch_size: int = 16
+    max_embedding_concurrent_requests: int = 2
 
     qdrant_url: str = "http://qdrant:6333"
     qdrant_api_key: str = ""
@@ -80,8 +77,8 @@ class Settings(BaseSettings):
     sparse_vector_enabled: bool = True
     sparse_model: str = "Qdrant/bm25"
 
-    project_index_defaults_embedding_model_name: str = "minishlab/potion-base-32M"
-    project_index_defaults_embedding_dimension: int = 256
+    project_index_defaults_embedding_model_name: str = "qwen/qwen3-embedding-4b"
+    project_index_defaults_embedding_dimension: int = 2560
     project_index_defaults_parser_name: str = "docling"
     project_index_defaults_parser_version: str = ""
     project_index_defaults_chunking_strategy: str = "recursive"
@@ -113,5 +110,7 @@ class Settings(BaseSettings):
     prompts_dir: str = "/app/prompts"
 
     dependency_startup_checks_enabled: bool = True
+
+    generate_summary: bool = False
 
     model_config = {"env_prefix": "", "case_sensitive": False}

@@ -13,9 +13,8 @@ from app.infra.files import FileStorage
 from app.infra.llm import LLMClient
 from app.infra.qdrant import QdrantRepository
 from app.infra.tei import TEIClient
-from app.support.text import Chunk, chunk_text
 from app.support.sparse import generate_sparse_vectors
-from app.services.documents import DocumentService
+from app.support.text import chunk_text
 
 logger = structlog.get_logger(__name__)
 
@@ -81,19 +80,23 @@ class IndexingService:
         except Exception as e:
             logger.error("document_indexing_failed",
                          document_id=document_id, job_id=job_id, error=str(e), exc_info=e)
-            await self._db.execute(
-                text("""
-                    UPDATE documents.document_processing_jobs
-                    SET status = 'failed', completed_at = CURRENT_TIMESTAMP, last_error = :err
-                    WHERE id = :jid
-                """),
-                {"jid": job_id, "err": str(e)},
-            )
-            await self._db.execute(
-                text("UPDATE documents.documents SET status = 'failed', failure_reason = :err WHERE id = :did"),
-                {"did": document_id, "err": str(e)},
-            )
-            await self._db.commit()
+            try:
+                await self._db.rollback()
+                await self._db.execute(
+                    text("""
+                        UPDATE documents.document_processing_jobs
+                        SET status = 'failed', completed_at = CURRENT_TIMESTAMP, last_error = :err
+                        WHERE id = :jid
+                    """),
+                    {"jid": job_id, "err": str(e)[:1000]},
+                )
+                await self._db.execute(
+                    text("UPDATE documents.documents SET status = 'failed', failure_reason = :err WHERE id = :did"),
+                    {"did": document_id, "err": str(e)[:1000]},
+                )
+                await self._db.commit()
+            except Exception:
+                pass
             return job_id
 
         await self._db.execute(
@@ -175,7 +178,20 @@ class IndexingService:
 
         async def embed_batch(texts: list[str]) -> list[list[float]]:
             async with sem:
-                return await self._tei.embed(texts, doc.embedding_dimension)
+                return await self._tei.embed(texts, doc.embedding_dimension, doc.embedding_model_name)
+
+        seen_texts: set[str] = set()
+        unique_chunks = []
+        for c in chunks:
+            if c.text not in seen_texts:
+                seen_texts.add(c.text)
+                unique_chunks.append(c)
+
+        if len(unique_chunks) < len(chunks):
+            logger.info("chunks_deduplicated",
+                        document_id=document_id,
+                        total=len(chunks), unique=len(unique_chunks),
+                        duplicates=len(chunks) - len(unique_chunks))
 
         chunk_ids = []
         texts = []
@@ -186,13 +202,12 @@ class IndexingService:
         )
         config_id = cfg_r.scalar()
 
-        total_batches = (len(chunks) + batch_size - 1) // batch_size
-        t_embed_start = _now_ms()
+        total_batches = (len(unique_chunks) + batch_size - 1) // batch_size
         total_embed_ms = 0
 
-        for batch_num, start in enumerate(range(0, len(chunks), batch_size)):
-            end = min(start + batch_size, len(chunks))
-            batch_chunks = chunks[start:end]
+        for batch_num, start in enumerate(range(0, len(unique_chunks), batch_size)):
+            end = min(start + batch_size, len(unique_chunks))
+            batch_chunks = unique_chunks[start:end]
             batch_texts = [c.text for c in batch_chunks]
 
             t_batch_start = _now_ms()
@@ -242,10 +257,15 @@ class IndexingService:
                 dense_vecs.append(batch_embeddings[j])
                 payloads.append({
                     "chunk_id": cid,
+                    "chunk_order": batch_chunks[j].order_id,
                     "document_id": document_id,
                     "project_id": project_id,
                     "index_config_id": config_id,
-                    "text": batch_chunks[j].text[:2000],
+                    "char_start": batch_chunks[j].char_start,
+                    "char_end": batch_chunks[j].char_end,
+                    "char_count": batch_chunks[j].char_count,
+                    "text": batch_chunks[j].text,
+                    "text_preview": batch_chunks[j].text[:2000],
                 })
 
             t_upsert = _now_ms()
@@ -255,6 +275,7 @@ class IndexingService:
                 dense_vectors=dense_vecs,
                 sparse_vectors=sparse_vectors,
                 payloads=payloads,
+                point_ids=point_ids,
             )
             upsert_ms = _now_ms() - t_upsert
 
@@ -266,11 +287,14 @@ class IndexingService:
                         sparse_ms=round(sparse_ms),
                         upsert_ms=round(upsert_ms),
                         total_embedded=end,
-                        total_chunks=len(chunks))
+                        total_chunks=len(unique_chunks))
 
-        # Summary
+        # Summary (configurable)
         t_summary = _now_ms()
-        summary = await self._generate_summary(text_content, doc.name)
+        if self._settings.generate_summary:
+            summary = await self._generate_summary(text_content, doc.name)
+        else:
+            summary = ""
         summary_ms = _now_ms() - t_summary
 
         await self._db.execute(

@@ -45,7 +45,7 @@ def api(path: str) -> str:
     return f"{BASE}/api/v1{path}"
 
 
-async def wait_for_api(timeout: int = 30) -> bool:
+async def wait_for_api(timeout: int = 15) -> bool:
     log("Waiting for API...")
     deadline = time_mod.time() + timeout
     async with httpx.AsyncClient() as client:
@@ -62,7 +62,7 @@ async def wait_for_api(timeout: int = 30) -> bool:
     return False
 
 
-async def wait_for_document(client: httpx.AsyncClient, project_id: int, doc_id: int, timeout: int = 120) -> str:
+async def wait_for_document(client: httpx.AsyncClient, project_id: int, doc_id: int, timeout: int = 20) -> str:
     log(f"  Waiting for document {doc_id} to index (timeout={timeout}s)...")
     deadline = time_mod.time() + timeout
     elapsed = 0
@@ -79,7 +79,7 @@ async def wait_for_document(client: httpx.AsyncClient, project_id: int, doc_id: 
     return "timeout"
 
 
-async def wait_for_analysis(client: httpx.AsyncClient, project_id: int, job_id: int, timeout: int = 180) -> str:
+async def wait_for_analysis(client: httpx.AsyncClient, project_id: int, job_id: int, timeout: int = 120) -> str:
     log(f"  Waiting for analysis job {job_id} to complete (timeout={timeout}s)...")
     deadline = time_mod.time() + timeout
     elapsed = 0
@@ -169,10 +169,10 @@ async def test_full_pipeline(api_ready: bool):
             docs = r.json()
             log(f"  {docs['total']} documents in project")
 
-            # 6. Wait for indexing (slow — Docling parses PDFs on CPU)
-            log("[6] Waiting for indexing (Docling PDF parsing — may take several minutes)...")
+            # 6. Wait for indexing
+            log("[6] Waiting for indexing...")
             for did in doc_ids:
-                status = await wait_for_document(client, project_id, did, timeout=600)
+                status = await wait_for_document(client, project_id, did, timeout=20)
                 assert status == "indexed", f"Document {did} failed indexing: {status}"
 
             # 7. Get document text
@@ -225,7 +225,7 @@ async def test_full_pipeline(api_ready: bool):
             log(f"  Analysis job id={job_id} started")
 
             # 12. Wait for analysis
-            job_status = await wait_for_analysis(client, project_id, job_id, timeout=300)
+            job_status = await wait_for_analysis(client, project_id, job_id, timeout=120)
             assert job_status == "completed", f"Analysis job failed: {job_status}"
 
             # 13. Get analysis results
@@ -306,7 +306,7 @@ async def test_all_document_formats(api_ready: bool):
                 log(f"    Document id={doc['id']}")
 
             for did in doc_ids:
-                status = await wait_for_document(client, project_id, did, timeout=600)
+                status = await wait_for_document(client, project_id, did, timeout=20)
                 assert status == "indexed", f"Document {did} failed: {status}"
 
             for did in doc_ids:

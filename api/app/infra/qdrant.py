@@ -26,6 +26,7 @@ class QdrantRepository:
             existing_size = info.config.params.vectors["dense"].size
             if existing_size == vector_size:
                 logger.info("Qdrant collection already exists", extra={"collection": collection_name})
+                await self._ensure_payload_indexes(collection_name)
                 return
             logger.warning(
                 "Qdrant collection dimension mismatch, recreating",
@@ -48,7 +49,31 @@ class QdrantRepository:
             sparse_vectors_config=sparse_vectors_config,
             on_disk_payload=on_disk_payload,
         )
+        await self._ensure_payload_indexes(collection_name)
         logger.info("Qdrant collection created", extra={"collection": collection_name})
+
+    async def _ensure_payload_indexes(self, collection_name: str) -> None:
+        for field_name in (
+            "chunk_id",
+            "chunk_order",
+            "document_id",
+            "project_id",
+            "index_config_id",
+            "char_start",
+            "char_end",
+            "char_count",
+        ):
+            try:
+                await self._client.create_payload_index(
+                    collection_name=collection_name,
+                    field_name=field_name,
+                    field_schema=qdrant_models.PayloadSchemaType.INTEGER,
+                )
+            except Exception:
+                logger.debug(
+                    "Qdrant payload index already exists or could not be created",
+                    extra={"collection": collection_name, "field": field_name},
+                )
 
     async def upsert_chunks(
         self,
@@ -57,8 +82,10 @@ class QdrantRepository:
         dense_vectors: list[list[float]],
         sparse_vectors: Optional[list[dict]] = None,
         payloads: Optional[list[dict]] = None,
+        point_ids: Optional[list[uuid.UUID]] = None,
     ) -> list[uuid.UUID]:
-        point_ids = [uuid.uuid4() for _ in chunk_ids]
+        if point_ids is None:
+            point_ids = [uuid.uuid4() for _ in chunk_ids]
         assert len(chunk_ids) == len(dense_vectors)
 
         points = []
@@ -81,38 +108,152 @@ class QdrantRepository:
         limit: int = 5,
         filter_condition: Optional[qdrant_models.Filter] = None,
     ) -> list[dict]:
-        prefetch = []
-        prefetch.append(
-            qdrant_models.Prefetch(
-                query=query_vector,
-                using="dense",
-                limit=limit * 2,
+        mode = self.resolve_retrieval_mode(dense_weight, sparse_weight, sparse_vector)
+        if mode == "sparse":
+            points = await self._client.query_points(
+                collection_name=collection_name,
+                query=sparse_vector,
+                using="sparse",
+                limit=limit,
+                query_filter=filter_condition,
+                with_payload=True,
             )
-        )
-        if sparse_vector:
-            prefetch.append(
+            return self._format_query_points(points.points)
+
+        if mode == "dense":
+            return await self.search_dense(
+                collection_name=collection_name,
+                query_vector=query_vector,
+                limit=limit,
+                filter_condition=filter_condition,
+            )
+
+        fetch_limit = max(limit * 2, limit)
+        points = await self._client.query_points(
+            collection_name=collection_name,
+            prefetch=[
+                qdrant_models.Prefetch(
+                    query=query_vector,
+                    using="dense",
+                    limit=fetch_limit,
+                    filter=filter_condition,
+                ),
                 qdrant_models.Prefetch(
                     query=sparse_vector,
                     using="sparse",
-                    limit=limit * 2,
-                )
-            )
-
-        results = await self._client.query_points(
-            collection_name=collection_name,
-            prefetch=prefetch,
-            query=qdrant_models.FusionQuery(fusion=qdrant_models.Fusion.RRF),
-            query_filter=filter_condition,
+                    limit=fetch_limit,
+                    filter=filter_condition,
+                ),
+            ],
+            query=self._weighted_rrf_query(dense_weight, sparse_weight),
             limit=limit,
+            with_payload=True,
+        )
+        return self._format_query_points(points.points)
+
+    async def search_similar_hybrid_by_point(
+        self,
+        collection_name: str,
+        positive_point_id: uuid.UUID,
+        sparse_vector: Optional[dict] = None,
+        dense_weight: float = 0.5,
+        sparse_weight: float = 0.5,
+        limit: int = 5,
+        max_distance: Optional[float] = None,
+        filter_condition: Optional[qdrant_models.Filter] = None,
+    ) -> list[dict]:
+        mode = self.resolve_retrieval_mode(dense_weight, sparse_weight, sparse_vector)
+        if mode == "sparse":
+            points = await self._client.query_points(
+                collection_name=collection_name,
+                query=sparse_vector,
+                using="sparse",
+                limit=limit,
+                query_filter=filter_condition,
+                with_payload=True,
+            )
+            results = self._format_query_points(points.points)
+            return self._filter_by_distance(results, max_distance)[:limit]
+
+        dense_query = qdrant_models.RecommendQuery(
+            recommend=qdrant_models.RecommendInput(positive=[positive_point_id])
+        )
+        if mode == "dense":
+            points = await self._client.query_points(
+                collection_name=collection_name,
+                query=dense_query,
+                using="dense",
+                limit=limit,
+                query_filter=filter_condition,
+                with_payload=True,
+            )
+            results = self._format_query_points(points.points)
+            return self._filter_by_distance(results, max_distance)[:limit]
+
+        fetch_limit = max(limit * 2, limit)
+        points = await self._client.query_points(
+            collection_name=collection_name,
+            prefetch=[
+                qdrant_models.Prefetch(
+                    query=dense_query,
+                    using="dense",
+                    limit=fetch_limit,
+                    filter=filter_condition,
+                ),
+                qdrant_models.Prefetch(
+                    query=sparse_vector,
+                    using="sparse",
+                    limit=fetch_limit,
+                    filter=filter_condition,
+                ),
+            ],
+            query=self._weighted_rrf_query(dense_weight, sparse_weight),
+            limit=fetch_limit,
+            with_payload=True,
+        )
+        results = self._format_query_points(points.points)
+        return self._filter_by_distance(results, max_distance)[:limit]
+
+    def _weighted_rrf_query(self, dense_weight: float, sparse_weight: float) -> qdrant_models.RrfQuery:
+        return qdrant_models.RrfQuery(
+            rrf=qdrant_models.Rrf(weights=[float(dense_weight), float(sparse_weight)])
         )
 
+    def resolve_retrieval_mode(
+        self,
+        dense_weight: float,
+        sparse_weight: float,
+        sparse_vector: Optional[dict],
+    ) -> str:
+        has_dense = dense_weight > 0
+        has_sparse = sparse_weight > 0 and self._has_sparse_vector(sparse_vector)
+        if has_dense and has_sparse:
+            return "hybrid"
+        if has_sparse:
+            return "sparse"
+        return "dense"
+
+    def _has_sparse_vector(self, sparse_vector: Optional[dict]) -> bool:
+        return bool(sparse_vector and sparse_vector.get("indices") and sparse_vector.get("values"))
+
+    def _format_query_points(self, points: list) -> list[dict]:
         return [
             {
-                "point_id": r.id,
-                "score": r.score,
-                "payload": r.payload or {},
+                "point_id": str(point.id) if point.id else "",
+                "score": point.score,
+                "distance": 1.0 - point.score if point.score is not None else None,
+                "payload": point.payload or {},
             }
-            for r in results.points
+            for point in points
+        ]
+
+    def _filter_by_distance(self, results: list[dict], max_distance: Optional[float]) -> list[dict]:
+        if max_distance is None:
+            return results
+        return [
+            result
+            for result in results
+            if result.get("distance") is not None and result["distance"] <= max_distance
         ]
 
     async def search_dense(
@@ -133,14 +274,7 @@ class QdrantRepository:
             with_payload=True,
         )
 
-        return [
-            {
-                "point_id": str(r.id) if r.id else "",
-                "score": r.score,
-                "payload": r.payload or {},
-            }
-            for r in results.points
-        ]
+        return self._format_query_points(results.points)
 
     async def delete_by_filter(
         self, collection_name: str, filter_condition: qdrant_models.Filter

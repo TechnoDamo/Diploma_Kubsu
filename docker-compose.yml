@@ -6,5 +6,5 @@ include:
   - ./document_parsing_service/docker-compose.yml
   - ./minio/docker-compose.yml
   - ./api/docker-compose.yaml
-  - ./frontend/docker-compose.yml
+# - ./frontend/docker-compose.yml   # run locally: cd frontend && npm run dev
   - ./graylog/docker-compose.yml

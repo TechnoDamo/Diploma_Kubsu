@@ -1,18 +1,71 @@
-## Document Ingestion / Parsing Service
+# Сервис разбора документов
 
-This component accepts raw document files (PDF, DOCX, TXT, etc.) and returns their extracted content (currently plain text).
+Этот компонент отвечает за извлечение текста из файлов. В основном сценарии Mimir
+использует Docling Serve: отдельный HTTP-сервис поверх библиотеки Docling.
 
-We use [Docling](https://github.com/docling-project/docling) (modern Python library for high-quality document parsing and structured text extraction) as the parsing engine.  
-For deployment, we use [Docling Serve](https://github.com/docling-project/docling-serve), which wraps the Docling library with a simple HTTP API server.
+Поддерживаемые системой форматы загрузки:
 
-The easiest way to deploy this component is by using the pre-built Docker container:
+- `PDF`
+- `DOCX`
+- `TXT`
+- `MD`
+- `HTML`
+
+Если в `.env` задано `USE_DOCLING=false`, backend использует встроенный Python fallback:
+`PyPDF2` для PDF, `python-docx` для DOCX, `BeautifulSoup` для HTML и обычное чтение
+для текстовых файлов. Такой режим быстрее поднимается локально, но Docling обычно
+лучше работает со сложными PDF.
+
+## Запуск в составе проекта
+
+Из корня репозитория:
+
+```bash
+make up
+```
+
+Профиль `DOCLING=local` включён по умолчанию, поэтому контейнер `mimir-docling`
+будет поднят автоматически. API обращается к нему по адресу:
+
+```text
+http://docling:5001
+```
+
+Снаружи контейнер доступен на:
+
+```text
+http://localhost:5001
+```
+
+## Запуск отдельно
 
 ```bash
 docker run -d \
   --name docling-serve \
   --restart unless-stopped \
-  --gpus all \
   -p 5001:5001 \
   -e DOCLING_SERVE_ENABLE_UI=1 \
   quay.io/docling-project/docling-serve:latest
 ```
+
+GPU для текущего сценария не обязателен. Если нужен GPU-вариант, добавьте параметры
+Docker под конкретную машину и установленный runtime.
+
+## Настройки
+
+| Переменная | Назначение |
+|------------|------------|
+| `DOCLING_BASE_URL` | Адрес Docling из контейнеров backend. Обычно `http://docling:5001`. |
+| `DOCLING_PORT` | Порт, опубликованный на host. По умолчанию `5001`. |
+| `DOCLING_TIMEOUT_SECONDS` | Таймаут разбора больших документов. |
+| `USE_DOCLING` | `true` — использовать Docling; `false` — Python fallback. |
+
+## Где смотреть ошибки
+
+```bash
+docker logs --tail 100 mimir-docling
+docker logs --tail 100 mimir-worker
+```
+
+Если документ переходит в `failed`, причина обычно хранится в поле `failure_reason`
+документа и в `last_error` задачи индексации.

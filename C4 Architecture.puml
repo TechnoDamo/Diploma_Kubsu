@@ -1,0 +1,44 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+LAYOUT_LEFT_RIGHT()
+
+title Mimir — C4 Container Diagram
+
+Person(user, "Пользователь", "Загружает документы, задаёт вопросы и запускает анализ противоречий.")
+
+System_Boundary(mimir, "Mimir") {
+  Container(frontend, "Frontend", "Next.js, React, Tailwind CSS", "Пользовательский интерфейс: проекты, документы, RAG-запросы, результаты анализа.")
+  Container(api, "FastAPI API", "Python 3.12, FastAPI", "HTTP API: проекты, документы, загрузка файлов, RAG-запросы, статусы задач.")
+  Container(worker, "Worker", "Python asyncio", "Фоновая обработка: индексация документов и анализ противоречий.")
+
+  ContainerDb(postgres, "PostgreSQL", "PostgreSQL 16", "Источник истины: проекты, документы, чанки, очередь задач, результаты анализа.")
+  ContainerDb(qdrant, "Qdrant", "Vector DB", "Dense + sparse векторы и payload для гибридного поиска.")
+  Container(storage, "File storage / MinIO", "Local FS или S3-compatible storage", "Оригинальные загруженные файлы.")
+
+  Container(docling, "Docling / Python parser", "Docling Serve, PyPDF2, python-docx, BeautifulSoup", "Извлечение текста из PDF, DOCX, TXT, MD и HTML.")
+  Container(embedding, "Embedding API / TEI", "OpenAI-compatible API или Hugging Face TEI", "Построение dense-векторов для чанков и вопросов.")
+  Container(llm, "LLM API", "OpenAI-compatible API или vLLM", "Генерация RAG-ответов и проверка потенциальных противоречий.")
+  Container(graylog, "Graylog", "Graylog, MongoDB, Elasticsearch", "Сбор и просмотр структурированных логов.")
+}
+
+Rel(user, frontend, "Работает с системой", "Browser")
+Rel(frontend, api, "REST API, JSON, multipart upload", "HTTP")
+
+Rel(api, postgres, "Создаёт проекты, документы и задачи; читает статусы и результаты", "SQL")
+Rel(api, storage, "Сохраняет и отдаёт оригиналы файлов")
+Rel(api, embedding, "Векторизует вопрос пользователя", "HTTP")
+Rel(api, qdrant, "Ищет релевантные чанки", "HTTP")
+Rel(api, llm, "Передаёт вопрос и контекст для генерации ответа", "HTTP")
+Rel(api, graylog, "Пишет структурированные логи", "GELF")
+
+Rel(worker, postgres, "Забирает queued jobs; пишет чанки, статусы и результаты", "SQL")
+Rel(worker, storage, "Читает оригиналы файлов")
+Rel(worker, docling, "Отправляет документы на разбор", "HTTP")
+Rel(worker, embedding, "Векторизует чанки документов", "HTTP")
+Rel(worker, qdrant, "Записывает dense+sparse vectors и payload", "HTTP")
+Rel(worker, llm, "Проверяет пары фрагментов на противоречие", "HTTP")
+Rel(worker, graylog, "Пишет структурированные логи", "GELF")
+
+@enduml
