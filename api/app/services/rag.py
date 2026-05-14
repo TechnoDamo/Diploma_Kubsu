@@ -170,7 +170,7 @@ class RAGService:
         context = "\n\n---\n\n".join(context_parts)
 
         try:
-            answer = await self._answer_with_llm(project_id, question, context)
+            answer = await self._answer_with_llm(project_id, question, context, target_document_ids)
         except Exception as e:
             logger.warning("LLM answer generation failed, using fallback", exc_info=e)
             answer = self._build_fallback_answer(citations)
@@ -327,17 +327,26 @@ class RAGService:
     async def _rewrite_question(self, question: str) -> str:
         prompt_path = Path(self._settings.prompts_dir) / "rag_request.txt"
         try:
-            system = prompt_path.read_text(encoding="utf-8")
+            raw = prompt_path.read_text(encoding="utf-8")
         except (OSError, TypeError):
             return question
 
-        prompt = system.replace("{{user_query}}", question)
+        parts = raw.split("# Сейчас преобразуй запрос", 1)
+        system = parts[0].strip()
+        user_template = ("# Сейчас преобразуй запрос" + parts[1]).strip() if len(parts) > 1 else ""
+        user = user_template.replace("{{user_query}}", question)
         try:
-            return (await self._llm.complete("", prompt)).strip()
+            return (await self._llm.complete(system, user)).strip()
         except Exception:
             return question
 
-    async def _answer_with_llm(self, project_id: int, question: str, context: str) -> str:
+    async def _answer_with_llm(
+        self,
+        project_id: int,
+        question: str,
+        context: str,
+        target_document_ids: Optional[list[int]] = None,
+    ) -> str:
         prompt_path = Path(self._settings.prompts_dir) / "rag_response.txt"
         try:
             system = prompt_path.read_text(encoding="utf-8")
@@ -348,23 +357,46 @@ class RAGService:
             "{{retrieved_chunks}}", context
         )
 
-        project_context = await self._load_project_context(project_id)
-        if project_context:
+        doc_summaries = await self._load_document_summaries(project_id, target_document_ids)
+        if doc_summaries:
             system += (
-                "\n\n[Проект, о котором задан вопрос, содержит следующие документы:\n"
-                f"{project_context}\n"
-                "Конец описания проекта.]"
+                "\n\n## Краткое содержание документов\n\n"
+                "Ниже приведены краткие описания документов, к которым относится вопрос:\n\n"
+                f"{doc_summaries}\n"
             )
 
         return await self._llm.complete(system, "")
 
-    async def _load_project_context(self, project_id: int) -> str:
-        r = await self._db.execute(
-            text("SELECT general_context FROM documents.projects WHERE id = :pid"),
-            {"pid": project_id},
-        )
-        row = r.first()
-        return row.general_context.strip() if row and row.general_context else ""
+    async def _load_document_summaries(
+        self,
+        project_id: int,
+        target_document_ids: Optional[list[int]] = None,
+    ) -> str:
+        if target_document_ids:
+            r = await self._db.execute(
+                text("""
+                    SELECT name, summary FROM documents.documents
+                    WHERE project_id = :pid AND id = ANY(:ids) AND status = 'indexed'
+                      AND summary IS NOT NULL AND summary != ''
+                    ORDER BY id
+                """),
+                {"pid": project_id, "ids": target_document_ids},
+            )
+        else:
+            r = await self._db.execute(
+                text("""
+                    SELECT name, summary FROM documents.documents
+                    WHERE project_id = :pid AND status = 'indexed'
+                      AND summary IS NOT NULL AND summary != ''
+                    ORDER BY id
+                """),
+                {"pid": project_id},
+            )
+        rows = r.all()
+        if not rows:
+            return ""
+        parts = [f"**{row.name}**: {row.summary}" for row in rows]
+        return "\n\n".join(parts)
 
     async def _generate_query_sparse(self, text: str) -> Optional[dict]:
         if not self._settings.sparse_vector_enabled:

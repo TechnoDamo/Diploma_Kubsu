@@ -1,11 +1,11 @@
 import json
-import logging
 
+import structlog
 import httpx
 
 from app.support.retry import retry_call
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class LLMClient:
@@ -26,6 +26,16 @@ class LLMClient:
         self._retry_delay = retry_delay
 
     async def complete(self, system: str, user: str, json_mode: bool = False) -> str:
+        log_kwargs = {
+            "url": self._base_url,
+            "model": self._model,
+            "json_mode": json_mode,
+        }
+        if system:
+            log_kwargs["system_prompt"] = system
+        if user:
+            log_kwargs["user_prompt"] = user
+        logger.info("LLM request", **log_kwargs)
         async def _request():
             headers = {"Content-Type": "application/json"}
             if self._api_key:
@@ -49,7 +59,14 @@ class LLMClient:
                 )
                 resp.raise_for_status()
                 data = resp.json()
-                return data["choices"][0]["message"]["content"]
+                content = data["choices"][0]["message"]["content"]
+                logger.info(
+                    "LLM response",
+                    url=self._base_url,
+                    model=self._model,
+                    content=content,
+                )
+                return content
 
         return await retry_call(
             _request,

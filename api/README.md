@@ -96,11 +96,37 @@ api/
 В Qdrant payload сохраняются `chunk_order`, `char_start`, `char_end`,
 `char_count`, полный `text` и `text_preview`.
 
+#### Суммаризация документов
+
+Если `GENERATE_SUMMARY=true` (по умолчанию), при индексации каждого документа
+LLM генерирует краткое описание (сводку) документа. Алгоритм:
+
+- Текст документа нарезается на сегменты размером до `SUMMARY_SEGMENT_SIZE` символов.
+- Каждый сегмент суммаризируется LLM по промпту из `prompts/document_summary_segment.txt`
+  (плейсхолдеры: `{{doc_description}}` и `{{fragment}}`).
+- Если сегментов несколько, их сводки объединяются в итоговое описание (до 5 предложений)
+  по промпту из `prompts/document_summary_combine.txt`
+  (плейсхолдеры: `{{doc_name}}` и `{{segment_summaries}}`).
+- Количество параллельных LLM-запросов ограничено `MAX_SUMMARY_LLM_CONCURRENT_REQUESTS`.
+- Готовая сводка сохраняется в `documents.documents.summary`.
+
+При RAG-запросе сводки документов, к которым относится вопрос (указанных в
+`target_document_ids`, или всех проиндексированных документов проекта, если цель
+не указана), загружаются из базы и подставляются в LLM-промпт под заголовком
+«Краткое содержание документов». Это даёт модели общее представление о том, о чём
+эти документы, до того как она начнёт отвечать по конкретным чанкам.
+
+Все промпты суммаризации (`prompts/document_summary_segment.txt`,
+`prompts/document_summary_combine.txt`, `prompts/contradiction_summary.txt`)
+можно редактировать без перезапуска сервисов — они читаются при каждом вызове.
+
 ### RAG
 
 1. `RAGService` векторизует вопрос.
 2. Qdrant возвращает релевантные чанки.
-3. Сервис собирает контекст и отправляет его в LLM.
+3. Если `generate_summary` включена (по умолчанию — да), сервис загружает сводки целевых
+   документов (или всех проиндексированных документов проекта, если цель не указана)
+   и подставляет их в LLM-промпт под заголовком «Краткое содержание документов».
 4. Ответ возвращается синхронно вместе с цитатами.
 
 RAG retrieval использует веса из активной конфигурации проекта
@@ -264,10 +290,16 @@ curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/qu
 | `PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION` | Размерность векторов; должна совпадать с моделью. |
 | `RAG_DENSE_WEIGHT`, `RAG_SPARSE_WEIGHT` | Веса dense/sparse веток для RAG, если в конфигурации проекта нет своих значений; оба значения больше нуля включают Qdrant weighted RRF. |
 | `CONTRADICTION_DENSE_WEIGHT`, `CONTRADICTION_SPARSE_WEIGHT` | Веса dense/sparse веток для анализа противоречий; оба значения больше нуля включают Qdrant weighted RRF. |
+| `CONTRADICTION_TOP_K`, `CONTRADICTION_MAX_DISTANCE` | Ширина retrieval на каждый базовый чанк и отсечение слабых совпадений; для юридических документов рекомендуемые defaults: `20` и `0.8`. |
+| `CONTRADICTION_MAX_CANDIDATES_PER_TARGET`, `CONTRADICTION_MAX_PAIRS_PER_JOB` | Верхние границы кандидатов после сортировки и пар, отправляемых в LLM; рекомендуемые defaults для интерактивной проверки: `40` и `100`. |
+| `MAX_CONTRADICTION_LLM_CONCURRENT_REQUESTS` | Максимальное количество параллельных LLM-проверок пар внутри одной задачи анализа; рекомендуемый default: `9`, если провайдер LLM выдерживает такую параллельность. |
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | OpenAI-compatible LLM для RAG и анализа. |
 | `USE_DOCLING` | `true` для Docling, `false` для Python fallback-парсинга. |
 | `UPLOAD_MAX_SIZE_MB` | Максимальный размер загружаемого файла. |
 | `WORKER_POLL_INTERVAL_SECONDS` | Частота опроса очереди worker'ом. |
+| `GENERATE_SUMMARY` | Включает/выключает LLM-суммаризацию документов при индексации (по умолчанию `true`). |
+| `SUMMARY_SEGMENT_SIZE` | Максимальный размер сегмента текста (в символах) для посегментной суммаризации (по умолчанию `10000`). |
+| `MAX_SUMMARY_LLM_CONCURRENT_REQUESTS` | Максимальное количество параллельных запросов к LLM при генерации сводок (по умолчанию `3`). |
 
 Полный список находится в корневом `.env.example`.
 

@@ -1,10 +1,13 @@
 .idea/
 embedding/data/
 .tools/
+__pycache__/
+*.py[cod]
 api/.cache/
 api/.env
 api/var/
 api/storage/
+contradiction_test.md
 .env
 graylog/elasticsearch_data/
 graylog/mongodb_data/

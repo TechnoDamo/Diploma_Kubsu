@@ -80,7 +80,7 @@ async def main():
     llm = await get_llm_client()
 
     indexing = IndexingService(db, storage, docling, tei, qdrant, llm, settings)
-    analysis = AnalysisService(db, llm, qdrant, settings)
+    analysis = AnalysisService(db, llm, qdrant, settings, tei)
 
     worker = Worker(
         db=db,

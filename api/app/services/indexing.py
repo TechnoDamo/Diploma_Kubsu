@@ -1,6 +1,7 @@
 import asyncio
 import time
 import uuid
+from pathlib import Path
 from typing import Optional
 
 import structlog
@@ -301,14 +302,6 @@ class IndexingService:
             text("UPDATE documents.documents SET status = 'indexed', summary = :summary WHERE id = :did"),
             {"did": document_id, "summary": summary},
         )
-        await self._db.execute(
-            text("""
-                UPDATE documents.projects
-                SET general_context = general_context || '\n\n' || :summary
-                WHERE id = :pid AND general_context NOT LIKE '%' || :doc_name || '%'
-            """),
-            {"pid": project_id, "summary": summary, "doc_name": doc.name},
-        )
         await self._db.commit()
 
         total_ms = _now_ms() - t0
@@ -323,7 +316,7 @@ class IndexingService:
         if not text.strip():
             return f"Документ: {doc_name}"
 
-        seg_size = 10000
+        seg_size = self._settings.summary_segment_size
         segments = [text[i:i + seg_size] for i in range(0, len(text), seg_size)]
 
         if len(segments) == 1:
@@ -331,7 +324,7 @@ class IndexingService:
 
         logger.info("Generating segment summaries", doc=doc_name, segments=len(segments))
         sem = asyncio.Semaphore(
-            max(1, self._settings.max_contradiction_llm_concurrent_requests)
+            max(1, self._settings.max_summary_llm_concurrent_requests)
         )
 
         async def summarize_one(seg: str, idx: int) -> Optional[str]:
@@ -348,28 +341,44 @@ class IndexingService:
 
         logger.info("Generating final summary", doc=doc_name, segment_summaries=len(valid))
         combined = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(valid))
-        prompt = (
-            "Ты — ассистент. Ниже приведены краткие описания различных частей одного документа. "
-            f"Составь итоговое описание документа \"{doc_name}\" (до 5 предложений), "
-            "охватывающее его тему, тип, ключевые понятия и основные выводы. Отвечай на русском.\n\n"
-            f"Описания частей:\n{combined}\n\nИтоговое описание:"
-        )
+        prompt = (await self._load_prompt("document_summary_combine.txt"))
+        if prompt:
+            prompt = prompt.replace("{{doc_name}}", doc_name).replace("{{segment_summaries}}", combined)
+        else:
+            prompt = (
+                "Ты — ассистент. Ниже приведены краткие описания различных частей одного документа. "
+                f"Составь итоговое описание документа \"{doc_name}\" (до 5 предложений), "
+                "охватывающее его тему, тип, ключевые понятия и основные выводы. Отвечай на русском.\n\n"
+                f"Описания частей:\n{combined}\n\nИтоговое описание:"
+            )
         try:
             return (await self._llm.complete("", prompt)).strip()
         except Exception as e:
             logger.warning("Failed to generate final summary: %s", e)
             return valid[0] if valid else f"Документ: {doc_name}"
 
+    async def _load_prompt(self, filename: str) -> Optional[str]:
+        prompt_path = Path(self._settings.prompts_dir) / filename
+        try:
+            return prompt_path.read_text(encoding="utf-8")
+        except (OSError, TypeError):
+            logger.warning("Failed to load prompt: %s", filename)
+            return None
+
     async def _summarize_segment(self, text: str, doc_name: str, label: str = "") -> Optional[str]:
-        sample = text[:10000]
+        sample = text[:self._settings.summary_segment_size]
         if not sample.strip():
             return None
         desc = f"документа \"{doc_name}\"" + (f" ({label})" if label else "")
-        prompt = (
-            f"Кратко опиши (2-3 предложения) содержание {desc} на основе приведённого фрагмента. "
-            "Укажи тему и ключевые понятия. Отвечай на русском.\n\n"
-            f"Фрагмент:\n{sample}\n\nКраткое описание:"
-        )
+        prompt = (await self._load_prompt("document_summary_segment.txt"))
+        if prompt:
+            prompt = prompt.replace("{{doc_description}}", desc).replace("{{fragment}}", sample)
+        else:
+            prompt = (
+                f"Кратко опиши (2-3 предложения) содержание {desc} на основе приведённого фрагмента. "
+                "Укажи тему и ключевые понятия. Отвечай на русском.\n\n"
+                f"Фрагмент:\n{sample}\n\nКраткое описание:"
+            )
         try:
             return (await self._llm.complete("", prompt)).strip()
         except Exception as e:

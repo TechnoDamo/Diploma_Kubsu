@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import Settings
 from app.infra.llm import LLMClient
 from app.infra.qdrant import QdrantRepository
+from app.infra.tei import TEIClient
 from app.support.sparse import generate_sparse_vectors
 
 logger = structlog.get_logger(__name__)
@@ -25,11 +26,13 @@ class AnalysisService:
         llm: LLMClient,
         qdrant: QdrantRepository,
         settings: Settings,
+        tei: TEIClient,
     ):
         self._db = db
         self._llm = llm
         self._qdrant = qdrant
         self._settings = settings
+        self._tei = tei
 
     async def start_analysis(
         self,
@@ -198,8 +201,8 @@ class AnalysisService:
                 await self._db.execute(
                     text("""
                         UPDATE analysis.analysis_jobs
-                        SET status = 'failed', completed_at = CURRENT_TIMESTAMP,
-                            error_message = :err, updated_at = CURRENT_TIMESTAMP
+                        SET status = 'failed', completed_at = clock_timestamp(),
+                            error_message = :err, updated_at = clock_timestamp()
                         WHERE id = :jid
                     """),
                     {"jid": job_id, "err": str(e)[:1000]},
@@ -229,6 +232,8 @@ class AnalysisService:
         cfg = cfg_r.first()
         if not cfg:
             raise RuntimeError("No active index config found")
+
+        base_name = await self._resolve_document_name(base_doc_id)
 
         top_k = (
             cfg.contradiction_top_k
@@ -265,6 +270,7 @@ class AnalysisService:
                 return await self._collect_candidates(
                     base_doc_id, tid, top_k, max_dist, max_candidates,
                     dense_weight, sparse_weight, collection_name,
+                    cfg.embedding_model_name, cfg.embedding_dimension,
                 )
 
         tasks = [collect_target(tid) for tid in target_ids]
@@ -277,7 +283,7 @@ class AnalysisService:
         seen = set()
         deduped = []
         for c in all_candidates:
-            key = (c["target_document_id"], c.get("base_order", 0))
+            key = (c["target_document_id"], c.get("base_order", 0), c.get("target_order", 0))
             if key not in seen:
                 seen.add(key)
                 deduped.append(c)
@@ -288,8 +294,8 @@ class AnalysisService:
             await self._db.execute(
                 text("""
                     UPDATE analysis.analysis_jobs
-                    SET status = 'completed', completed_at = CURRENT_TIMESTAMP,
-                        results = '[]'::jsonb, updated_at = CURRENT_TIMESTAMP
+                    SET status = 'completed', completed_at = clock_timestamp(),
+                        results = '[]'::jsonb, updated_at = clock_timestamp()
                     WHERE id = :jid
                 """),
                 {"jid": job_id},
@@ -333,10 +339,21 @@ class AnalysisService:
         results_summary = []
         for tid, group in by_target.items():
             findings = "\n".join(
-                f"{i+1}. {c['explanation']}"
+                "\n".join(
+                    [
+                        f"{i+1}.",
+                        f"- Документ «{base_name}» утверждает: {c['base_text']}",
+                        f"- Документ «{group['target_document_name']}» утверждает: {c['target_text']}",
+                        f"- Суть противоречия: {c['explanation']}",
+                    ]
+                )
                 for i, c in enumerate(group["contradictions"])
             )
-            summary = await self._summarize_contradictions(group["target_document_name"], findings)
+            summary = await self._summarize_contradictions(
+                base_name,
+                group["target_document_name"],
+                findings,
+            )
             results_summary.append({
                 "target_document_id": tid,
                 "target_document_name": group["target_document_name"],
@@ -347,8 +364,8 @@ class AnalysisService:
         await self._db.execute(
             text("""
                 UPDATE analysis.analysis_jobs
-                SET status = 'completed', completed_at = CURRENT_TIMESTAMP,
-                    results = :results, updated_at = CURRENT_TIMESTAMP
+                SET status = 'completed', completed_at = clock_timestamp(),
+                    results = :results, updated_at = clock_timestamp()
                 WHERE id = :jid
             """),
             {"jid": job_id, "results": json.dumps(results_summary, ensure_ascii=False)},
@@ -378,6 +395,13 @@ class AnalysisService:
         )
         return [r.id for r in indexed_r]
 
+    async def _resolve_document_name(self, document_id: int) -> str:
+        doc_r = await self._db.execute(
+            text("SELECT name FROM documents.documents WHERE id = :did"),
+            {"did": document_id},
+        )
+        return doc_r.scalar() or f"Документ #{document_id}"
+
     async def _collect_candidates(
         self,
         base_doc_id: int,
@@ -388,6 +412,8 @@ class AnalysisService:
         dense_weight: float,
         sparse_weight: float,
         collection_name: str,
+        embedding_model: str,
+        embedding_dimension: int,
     ) -> list[dict]:
         target_name_r = await self._db.execute(
             text("SELECT name FROM documents.documents WHERE id = :did"),
@@ -461,10 +487,6 @@ class AnalysisService:
                     "target_text": payload.get("text", ""),
                     "distance": r.get("distance", 1.0),
                     "score": r.get("score", 0.0),
-                    "dense_score": r.get("dense_score"),
-                    "sparse_score": r.get("sparse_score"),
-                    "dense_score_raw": r.get("dense_score_raw"),
-                    "sparse_score_raw": r.get("sparse_score_raw"),
                 })
 
         candidates.sort(key=lambda c: c["distance"])
@@ -473,31 +495,41 @@ class AnalysisService:
     async def _judge_pair(self, candidate: dict) -> Optional[dict]:
         prompt_path = Path(self._settings.prompts_dir) / "contradiction_discovery.txt"
         try:
-            system = prompt_path.read_text(encoding="utf-8")
+            raw = prompt_path.read_text(encoding="utf-8")
         except (OSError, TypeError):
             return None
 
-        prompt = (
-            system.replace("{{statement_a}}", candidate.get("base_text", ""))
+        parts = raw.split("# Сейчас проанализируй", 1)
+        system = parts[0].strip()
+        user_template = ("# Сейчас проанализируй" + parts[1]).strip() if len(parts) > 1 else ""
+        user = (
+            user_template.replace("{{statement_a}}", candidate.get("base_text", ""))
             .replace("{{statement_b}}", candidate.get("target_text", ""))
         )
 
         try:
-            response = await self._llm.complete("", prompt, json_mode=True)
+            response = await self._llm.complete(system, user, json_mode=True)
             return json.loads(response)
         except Exception as e:
             logger.warning("LLM judgement failed for candidate", exc_info=e)
             return None
 
-    async def _summarize_contradictions(self, target_name: str, findings: str) -> str:
+    async def _summarize_contradictions(self, base_name: str, target_name: str, findings: str) -> str:
         prompt_path = Path(self._settings.prompts_dir) / "contradiction_summary.txt"
         try:
-            system = prompt_path.read_text(encoding="utf-8")
+            raw = prompt_path.read_text(encoding="utf-8")
         except (OSError, TypeError):
             return f"Обнаружены противоречия с документом {target_name}."
 
-        prompt = system.replace("{{contradiction_findings}}", findings)
+        parts = raw.split("# Сейчас сформируй сводку", 1)
+        system = parts[0].strip()
+        user_template = ("# Сейчас сформируй сводку" + parts[1]).strip() if len(parts) > 1 else ""
+        user = (
+            user_template.replace("{{base_document_name}}", base_name)
+            .replace("{{target_document_name}}", target_name)
+            .replace("{{contradiction_findings}}", findings)
+        )
         try:
-            return await self._llm.complete("", prompt)
+            return await self._llm.complete(system, user)
         except Exception:
             return f"Обнаружены противоречия с документом {target_name}."

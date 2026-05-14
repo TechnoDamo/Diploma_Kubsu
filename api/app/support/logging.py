@@ -22,20 +22,34 @@ class GELFLogHandler(logging.Handler):
         try:
             level_map = {logging.CRITICAL: 2, logging.ERROR: 3, logging.WARNING: 4,
                          logging.INFO: 6, logging.DEBUG: 7}
+
+            msg = record.getMessage()
+            event_name = msg
+            extra_fields = {}
+
+            try:
+                parsed = json.loads(msg)
+                if isinstance(parsed, dict):
+                    event_name = parsed.pop("event", msg)
+                    extra_fields = {f"_{k}": v for k, v in parsed.items()}
+            except (json.JSONDecodeError, TypeError, AttributeError):
+                pass
+
             gelf = {
                 "version": "1.1",
                 "host": self._localname,
-                "short_message": record.getMessage(),
+                "short_message": str(event_name),
                 "timestamp": record.created,
                 "level": level_map.get(record.levelno, 6),
                 "_facility": self._facility,
                 "_logger_name": record.name,
                 "_level": record.levelname,
             }
+            gelf.update(extra_fields)
             if record.exc_info and record.exc_info[0]:
                 gelf["full_message"] = "".join(traceback.format_exception(*record.exc_info))
 
-            payload = json.dumps(gelf, default=str).encode("utf-8")
+            payload = json.dumps(gelf, default=str, ensure_ascii=False).encode("utf-8")
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
                 sock.sendto(payload, (self._host, self._port))
         except Exception:
@@ -84,7 +98,7 @@ def setup_logging(
     ]
 
     if log_format == "json":
-        _shared_processors.append(structlog.processors.JSONRenderer())
+        _shared_processors.append(structlog.processors.JSONRenderer(ensure_ascii=False))
     else:
         _shared_processors.append(structlog.dev.ConsoleRenderer())
 

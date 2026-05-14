@@ -255,7 +255,7 @@ function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
           href={linkHref}
           target="_blank"
           rel="noreferrer noopener"
-          className="underline decoration-[var(--accent)]/45 underline-offset-2 hover:text-[var(--accent)]"
+          className="break-words underline decoration-[var(--accent)]/45 underline-offset-2 [overflow-wrap:anywhere] hover:text-[var(--accent)]"
         >
           {linkLabel}
         </a>
@@ -264,15 +264,23 @@ function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
       nodes.push(
         <code
           key={`${keyPrefix}-code-${index}`}
-          className="rounded bg-[var(--line)]/45 px-1.5 py-0.5 font-mono text-[0.9em]"
+          className="rounded bg-[var(--line)]/45 px-1.5 py-0.5 font-mono text-[0.9em] [overflow-wrap:anywhere]"
         >
           {inlineCode}
         </code>
       );
     } else if (boldA || boldB) {
-      nodes.push(<strong key={`${keyPrefix}-bold-${index}`}>{boldA ?? boldB}</strong>);
+      nodes.push(
+        <strong key={`${keyPrefix}-bold-${index}`} className="break-words [overflow-wrap:anywhere]">
+          {boldA ?? boldB}
+        </strong>
+      );
     } else if (italicA || italicB) {
-      nodes.push(<em key={`${keyPrefix}-italic-${index}`}>{italicA ?? italicB}</em>);
+      nodes.push(
+        <em key={`${keyPrefix}-italic-${index}`} className="break-words [overflow-wrap:anywhere]">
+          {italicA ?? italicB}
+        </em>
+      );
     } else {
       nodes.push(fullMatch);
     }
@@ -288,11 +296,12 @@ function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
   return nodes;
 }
 
-function renderMarkdownText(text: string) {
+function renderMarkdownText(text: string, mode: 'default' | 'compact' = 'default') {
   const lines = text.replace(/\r\n/g, '\n').split('\n');
   const blocks: ReactNode[] = [];
   let i = 0;
   let key = 0;
+  const compact = mode === 'compact';
 
   const isUnordered = (line: string) => /^\s*[-*+]\s+/.test(line);
   const isOrdered = (line: string) => /^\s*\d+\.\s+/.test(line);
@@ -327,7 +336,9 @@ function renderMarkdownText(text: string) {
       blocks.push(
         <pre
           key={`md-pre-${key}`}
-          className="overflow-x-auto rounded-xl border border-[var(--line)] bg-[var(--bg)]/75 p-3 font-mono text-xs sm:text-sm"
+          className={`overflow-x-auto rounded-xl border border-[var(--line)] bg-[var(--bg)]/75 font-mono ${
+            compact ? 'p-2 text-[11px]' : 'p-3 text-xs sm:text-sm'
+          }`}
         >
           {language ? <div className="mb-2 text-[10px] uppercase tracking-[0.14em] text-[var(--muted)]">{language}</div> : null}
           <code>{codeLines.join('\n')}</code>
@@ -342,11 +353,15 @@ function renderMarkdownText(text: string) {
       const level = Math.min(headingMatch[1].length, 6);
       const content = headingMatch[2];
       const titleClass =
-        level <= 2
-          ? 'text-base font-semibold sm:text-lg'
-          : level <= 4
-            ? 'text-sm font-semibold sm:text-base'
-            : 'text-sm font-medium';
+        compact
+          ? level <= 2
+            ? 'text-sm font-semibold text-[var(--text)]'
+            : 'text-xs font-semibold text-[var(--text)]'
+          : level <= 2
+            ? 'text-base font-semibold sm:text-lg'
+            : level <= 4
+              ? 'text-sm font-semibold sm:text-base'
+              : 'text-sm font-medium';
       blocks.push(
         <p key={`md-h-${key}`} className={titleClass}>
           {renderInlineMarkdown(content, `md-h-${key}`)}
@@ -364,7 +379,12 @@ function renderMarkdownText(text: string) {
         i += 1;
       }
       blocks.push(
-        <blockquote key={`md-q-${key}`} className="border-l-2 border-[var(--accent)]/45 pl-3 text-[var(--muted)]">
+        <blockquote
+          key={`md-q-${key}`}
+          className={`border-l-2 border-[var(--accent)]/45 text-[var(--muted)] ${
+            compact ? 'pl-2' : 'pl-3'
+          }`}
+        >
           {renderInlineMarkdown(quoteLines.join('\n'), `md-q-${key}`)}
         </blockquote>
       );
@@ -379,7 +399,7 @@ function renderMarkdownText(text: string) {
         i += 1;
       }
       blocks.push(
-        <ul key={`md-ul-${key}`} className="list-disc space-y-1 pl-5">
+        <ul key={`md-ul-${key}`} className={`list-disc space-y-1 ${compact ? 'pl-4' : 'pl-5'}`}>
           {items.map((item, idx) => (
             <li key={`md-ul-${key}-li-${idx}`}>{renderInlineMarkdown(item, `md-ul-${key}-li-${idx}`)}</li>
           ))}
@@ -396,7 +416,7 @@ function renderMarkdownText(text: string) {
         i += 1;
       }
       blocks.push(
-        <ol key={`md-ol-${key}`} className="list-decimal space-y-1 pl-5">
+        <ol key={`md-ol-${key}`} className={`list-decimal space-y-1 ${compact ? 'pl-4' : 'pl-5'}`}>
           {items.map((item, idx) => (
             <li key={`md-ol-${key}-li-${idx}`}>{renderInlineMarkdown(item, `md-ol-${key}-li-${idx}`)}</li>
           ))}
@@ -537,6 +557,7 @@ export default function HomePage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [contradictionJobs, setContradictionJobs] = useState<ContradictionJob[]>([]);
   const [expandedJobId, setExpandedJobId] = useState<number | null>(null);
+  const [expandedContradictionId, setExpandedContradictionId] = useState<string | null>(null);
   const [contradictionBaseDocId, setContradictionBaseDocId] = useState<number | null>(null);
   const [contradictionTargetDocIds, setContradictionTargetDocIds] = useState<number[]>([]);
   const [isRunningAnalysis, setIsRunningAnalysis] = useState(false);
@@ -2187,7 +2208,7 @@ export default function HomePage() {
           <p className="text-sm font-medium mb-3">Запустить новый анализ</p>
 
           <p className="text-xs text-[var(--muted)] mb-1">Основной документ:</p>
-          <p className="text-sm font-medium mb-3">
+          <p className="mb-3 break-words text-sm font-medium [overflow-wrap:anywhere]">
             {contradictionBaseDocId
               ? documents.find(d => d.id === contradictionBaseDocId)?.name || `#${contradictionBaseDocId}`
               : 'Не выбран'}
@@ -2206,7 +2227,7 @@ export default function HomePage() {
               documents
                 .filter(d => isDocumentIndexed(d.status) && d.id !== contradictionBaseDocId)
                 .map(doc => (
-                  <label key={doc.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-[var(--accent)]/8 rounded px-2 py-1">
+                  <label key={doc.id} className="flex items-start gap-2 text-sm cursor-pointer hover:bg-[var(--accent)]/8 rounded px-2 py-1">
                     <input
                       type="checkbox"
                       checked={contradictionTargetDocIds.includes(doc.id)}
@@ -2217,9 +2238,9 @@ export default function HomePage() {
                             : [...prev, doc.id]
                         );
                       }}
-                      className="accent-[var(--accent)]"
+                      className="mt-0.5 shrink-0 accent-[var(--accent)]"
                     />
-                    <span className="truncate">{doc.name}</span>
+                    <span className="min-w-0 break-words [overflow-wrap:anywhere]">{doc.name}</span>
                   </label>
                 ))
             )}
@@ -2263,8 +2284,8 @@ export default function HomePage() {
                     className="flex items-center gap-3 min-w-0 text-left flex-1"
                   >
                     <span className={`transition-transform shrink-0 ${expandedJobId === job.id ? 'rotate-90' : ''}`}>▶</span>
-                    <span className="font-medium truncate">Задача #{job.id}</span>
-                    <span className="text-sm text-[var(--muted)] shrink-0">
+                    <span className="shrink-0 font-medium">Задача #{job.id}</span>
+                    <span className="min-w-0 break-words text-sm text-[var(--muted)] [overflow-wrap:anywhere]">
                       {documents.find(d => d.id === job.baseDocumentId)?.name || 'Неизвестно'}
                     </span>
                   </button>
@@ -2298,9 +2319,9 @@ export default function HomePage() {
                 </div>
                 {expandedJobId === job.id && (
                   <div className="px-4 pb-4 border-t border-[var(--line)] pt-3 space-y-3">
-                    <div>
+                    <div className="min-w-0">
                       <span className="text-xs text-[var(--muted)]">Сравнение: </span>
-                      <span className="text-sm">
+                      <span className="break-words text-sm [overflow-wrap:anywhere]">
                         {job.targetDocumentIds.map(id => documents.find(d => d.id === id)?.name || id).join(', ') || 'Нет'}
                       </span>
                     </div>
@@ -2308,19 +2329,74 @@ export default function HomePage() {
                       <div className="space-y-3">
                         {job.result.map((group: ContradictionResult, gi: number) => (
                           <div key={gi} className="rounded-lg border border-[var(--line)] p-3">
-                            <div className="text-sm font-medium mb-2 text-amber-200">
+                            <div className="mb-2 break-words text-sm font-medium text-amber-200 [overflow-wrap:anywhere]">
                               {group.target_document_name || `Документ #${group.target_document_id}`}
                             </div>
                             {group.summary && (
-                              <p className="text-xs text-[var(--muted)] mb-2 leading-relaxed">{group.summary}</p>
-                            )}
-                            {group.contradictions?.map((c: Contradiction, ci: number) => (
-                              <div key={ci} className="mt-2 border-l-2 border-l-amber-400 pl-3 text-xs space-y-1">
-                                <p className="text-[var(--text)] opacity-80">База: {c.base_text}</p>
-                                <p className="text-[var(--text)] opacity-80">Цель: {c.target_text}</p>
-                                <p className="text-[var(--muted)]">{(c.confidence * 100).toFixed(0)}% — {c.explanation}</p>
+                              <div className="mb-3 space-y-2 text-xs leading-relaxed text-[var(--muted)]">
+                                {renderMarkdownText(group.summary, 'compact')}
                               </div>
-                            ))}
+                            )}
+                            <div className="space-y-2">
+                              {group.contradictions?.map((c: Contradiction, ci: number) => {
+                                const contradictionId = `${job.id}-${group.target_document_id}-${ci}`;
+                                const isOpen = expandedContradictionId === contradictionId;
+                                const confidence = Math.round(c.confidence * 100);
+
+                                return (
+                                  <div
+                                    key={contradictionId}
+                                    className="overflow-hidden rounded-lg border border-amber-400/20 bg-amber-400/[0.04]"
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => setExpandedContradictionId(isOpen ? null : contradictionId)}
+                                      className="flex w-full items-start gap-2 px-3 py-2 text-left transition hover:bg-amber-400/[0.07]"
+                                      aria-expanded={isOpen}
+                                    >
+                                      <ChevronDown
+                                        size={14}
+                                        className={`mt-0.5 shrink-0 text-amber-300 transition-transform ${
+                                          isOpen ? 'rotate-180' : ''
+                                        }`}
+                                      />
+                                      <span className="min-w-0 flex-1">
+                                        <span className="mb-1 flex flex-wrap items-center gap-2">
+                                          <span className="rounded-full border border-amber-400/35 bg-amber-400/10 px-2 py-0.5 text-[11px] font-medium text-amber-200">
+                                            {confidence}%
+                                          </span>
+                                        </span>
+                                        <div className="space-y-1 text-xs leading-relaxed text-[var(--text)]">
+                                          {renderMarkdownText(c.explanation, 'compact')}
+                                        </div>
+                                      </span>
+                                    </button>
+
+                                    {isOpen ? (
+                                      <div className="space-y-2 border-t border-amber-400/15 px-3 py-3 text-xs">
+                                        <div>
+                                          <div className="mb-1 text-[11px] font-medium uppercase tracking-[0.12em] text-amber-200">
+                                            Утверждение A
+                                          </div>
+                                          <p className="rounded-md border border-[var(--line)] bg-[var(--bg)]/55 p-2 leading-relaxed text-[var(--text)]/85">
+                                            {c.base_text}
+                                          </p>
+                                        </div>
+
+                                        <div>
+                                          <div className="mb-1 text-[11px] font-medium uppercase tracking-[0.12em] text-amber-200">
+                                            Утверждение B
+                                          </div>
+                                          <p className="rounded-md border border-[var(--line)] bg-[var(--bg)]/55 p-2 leading-relaxed text-[var(--text)]/85">
+                                            {c.target_text}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         ))}
                       </div>

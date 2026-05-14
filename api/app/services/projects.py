@@ -59,16 +59,14 @@ class ProjectService:
         return {"items": items, "total": total, "page": page, "limit": limit}
 
     async def create_project(self, name: str, description: Optional[str] = None) -> dict:
-        context = description or ""
-
         try:
             result = await self._db.execute(
                 text("""
-                    INSERT INTO documents.projects (name, description, general_context)
-                    VALUES (:name, :description, :context)
+                    INSERT INTO documents.projects (name, description)
+                    VALUES (:name, :description)
                     RETURNING id, name, description, created_at, updated_at
                 """),
-                {"name": name, "description": description or "", "context": context},
+                {"name": name, "description": description or ""},
             )
             row = result.first()
         except Exception as e:
@@ -87,16 +85,20 @@ class ProjectService:
                     parser_name, parser_version,
                     chunking_strategy, chunk_size, chunk_overlap, chunk_unit,
                     tokenizer_name,
-                    rag_dense_weight, rag_sparse_weight,
-                    contradiction_dense_weight, contradiction_sparse_weight
+                    rag_dense_weight, rag_sparse_weight, rag_top_k, rag_context_top_n,
+                    query_rewrite_enabled,
+                    contradiction_dense_weight, contradiction_sparse_weight,
+                    contradiction_top_k, contradiction_max_distance
                 ) VALUES (
                     :project_id, 1, true,
                     :embedding_model_name, :dimension,
                     :parser_name, :parser_version,
                     :chunking_strategy, :chunk_size, :chunk_overlap, :chunk_unit,
                     :tokenizer_name,
-                    :rag_dense_weight, :rag_sparse_weight,
-                    :contradiction_dense_weight, :contradiction_sparse_weight
+                    :rag_dense_weight, :rag_sparse_weight, :rag_top_k, :rag_context_top_n,
+                    :query_rewrite_enabled,
+                    :contradiction_dense_weight, :contradiction_sparse_weight,
+                    :contradiction_top_k, :contradiction_max_distance
                 )
             """),
             {
@@ -112,8 +114,13 @@ class ProjectService:
                 "tokenizer_name": self._settings.project_index_defaults_tokenizer_name or None,
                 "rag_dense_weight": self._settings.rag_dense_weight,
                 "rag_sparse_weight": self._settings.rag_sparse_weight,
+                "rag_top_k": self._settings.rag_retrieval_top_k,
+                "rag_context_top_n": self._settings.rag_context_top_n,
+                "query_rewrite_enabled": self._settings.query_rewrite_default_enabled,
                 "contradiction_dense_weight": self._settings.contradiction_dense_weight,
                 "contradiction_sparse_weight": self._settings.contradiction_sparse_weight,
+                "contradiction_top_k": self._settings.contradiction_top_k,
+                "contradiction_max_distance": self._settings.contradiction_max_distance,
             },
         )
 

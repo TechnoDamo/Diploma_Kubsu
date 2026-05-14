@@ -197,8 +197,20 @@ async def test_full_pipeline(api_ready: bool):
             # 6. Wait for indexing
             log("[6] Waiting for indexing...")
             for did in doc_ids:
-                status = await wait_for_document(client, project_id, did, timeout=90)
+                status = await wait_for_document(client, project_id, did, timeout=180)
                 assert status == "indexed", f"Document {did} failed indexing: {status}"
+
+            # 6a. Verify document summaries were generated
+            log("[6a] Verifying document summaries...")
+            for did in doc_ids:
+                r = await client.get(api(f"/projects/{project_id}/documents/{did}"))
+                assert r.status_code == 200, f"Get document {did} metadata failed: {r.text}"
+                doc = r.json()
+                summary = doc.get("summary")
+                assert summary, f"Document {did} has no summary (generate_summary may be off)"
+                assert len(summary) > 20, \
+                    f"Document {did} summary too short ({len(summary)} chars): {summary[:100]}"
+                log(f"  Document {did} summary ({len(summary)} chars): {summary[:120]}...")
 
             # 7. Get document text
             log("[7] Getting document text...")
@@ -407,9 +419,24 @@ async def test_all_document_formats(api_ready: bool):
                 doc_ids.append(doc["id"])
                 log(f"    Document id={doc['id']}")
 
-            for did in doc_ids:
-                status = await wait_for_document(client, project_id, did, timeout=90)
+            # Lightweight formats (txt, md, html, docx) — 60s each
+            for did in doc_ids[:-1]:
+                status = await wait_for_document(client, project_id, did, timeout=60)
                 assert status == "indexed", f"Document {did} failed: {status}"
+
+            # PDF (heavy — docling parsing + LLM summary) — 180s
+            status = await wait_for_document(client, project_id, doc_ids[-1], timeout=180)
+            assert status == "indexed", f"PDF document {doc_ids[-1]} failed: {status}"
+
+            # Verify summaries
+            log("  Verifying document summaries...")
+            for did in doc_ids:
+                r = await client.get(api(f"/projects/{project_id}/documents/{did}"))
+                assert r.status_code == 200, f"Get document {did} metadata failed: {r.text}"
+                doc = r.json()
+                summary = doc.get("summary")
+                assert summary, f"Document {did} has no summary"
+                log(f"    doc_id={did} summary_length={len(summary)}")
 
             for did in doc_ids:
                 r = await client.get(api(f"/projects/{project_id}/documents/{did}/text"))

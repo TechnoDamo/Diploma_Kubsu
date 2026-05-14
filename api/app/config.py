@@ -94,23 +94,24 @@ class Settings(BaseSettings):
     rag_retrieval_top_k: int = 5
     rag_context_top_n: int = 4
 
-    contradiction_dense_weight: float = 0.5
-    contradiction_sparse_weight: float = 0.5
-    contradiction_top_k: int = 5
-    contradiction_max_distance: float = 0.3
-    contradiction_max_candidates_per_target: int = 20
-    contradiction_max_pairs_per_job: int = 50
+    contradiction_dense_weight: float = 0.3
+    contradiction_sparse_weight: float = 0.7
+    contradiction_top_k: int = 20
+    contradiction_max_distance: float = 0.8
+    contradiction_max_candidates_per_target: int = 40
+    contradiction_max_pairs_per_job: int = 100
     max_contradiction_retrieval_concurrent_targets: int = 4
-    max_contradiction_llm_concurrent_requests: int = 3
+    max_contradiction_llm_concurrent_requests: int = 9
 
     graylog_enabled: bool = True
     graylog_host: str = "graylog"
     graylog_port: int = 12201
 
-    prompts_dir: str = "/app/prompts"
-
     dependency_startup_checks_enabled: bool = True
 
-    generate_summary: bool = False
+    generate_summary: bool = True
+
+    summary_segment_size: int = 10000
+    max_summary_llm_concurrent_requests: int = 3
 
     model_config = {"env_prefix": "", "case_sensitive": False}

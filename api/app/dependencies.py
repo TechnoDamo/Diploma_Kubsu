@@ -110,4 +110,4 @@ async def get_rag_service(db: AsyncSession = Depends(get_db)) -> RAGService:
 
 
 async def get_analysis_service(db: AsyncSession = Depends(get_db)) -> AnalysisService:
-    return AnalysisService(db, await get_llm_client(), await get_qdrant_repo(), get_settings())
+    return AnalysisService(db, await get_llm_client(), await get_qdrant_repo(), get_settings(), await get_tei_client())
