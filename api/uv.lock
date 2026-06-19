@@ -730,7 +730,7 @@ wheels = [
 ]
 
 [[package]]
-name = "mimir-api"
+name = "rag-system-api"
 version = "1.0.0"
 source = { virtual = "." }
 dependencies = [

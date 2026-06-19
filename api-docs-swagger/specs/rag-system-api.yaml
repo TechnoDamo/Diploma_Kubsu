@@ -1,39 +1,64 @@
 openapi: 3.1.0
 info:
-  title: Mimir RAG API
-  version: 1.3.0
+  title: RAG System RAG API
+  version: 1.0.0
   summary: HTTP API для проектов, документов, RAG-запросов и анализа противоречий
-  description: |
-    Актуальная спецификация публичного API Mimir.
-
-    Базовая модель работы:
-    - проект объединяет документы в отдельную базу знаний;
-    - загрузка документа создаёт фоновую задачу индексации;
-    - RAG-запросы работают только по документам со статусом `indexed`;
-    - анализ противоречий запускается асинхронно и опрашивается по `job_id`.
-
-servers:
-  - url: http://localhost:8080/api/v1
-    description: Локальный backend
+  description: Контракт синхронизирован с FastAPI-приложением в `api/app`.
 
 tags:
-  - name: Projects
+  - name: health
+    description: Health/readiness/liveness endpoints.
+  - name: projects
     description: Проекты, то есть отдельные базы знаний.
-  - name: Documents
-    description: Загрузка, удаление и получение документов.
-  - name: Content
-    description: Оригинальный файл и извлечённый текст.
-  - name: RAG
+  - name: documents
+    description: Загрузка, удаление, получение документов и их содержимого.
+  - name: rag
     description: Вопросы по проиндексированным документам проекта.
-  - name: Retrieval
+  - name: retrieval
     description: Отладочный retrieval без генерации ответа LLM.
-  - name: Analysis
+  - name: analysis
     description: Асинхронный поиск противоречий между документами.
 
 paths:
-  /projects:
+  /healthz:
     get:
-      tags: [Projects]
+      tags: [health]
+      summary: Basic health check
+      responses:
+        '200':
+          description: API is running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+
+  /healthz/ready:
+    get:
+      tags: [health]
+      summary: Readiness check
+      responses:
+        '200':
+          description: API is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+
+  /healthz/live:
+    get:
+      tags: [health]
+      summary: Liveness check with dependencies
+      responses:
+        '200':
+          description: API liveness and dependency status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Liveness'
+
+  /api/v1/projects:
+    get:
+      tags: [projects]
       summary: Список проектов
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -45,8 +70,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProjectList'
+        '422':
+          $ref: '#/components/responses/ValidationError'
     post:
-      tags: [Projects]
+      tags: [projects]
       summary: Создать проект
       requestBody:
         required: true
@@ -66,13 +93,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
 
-  /projects/{project_id}:
+  /api/v1/projects/{project_id}:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
     get:
-      tags: [Projects]
+      tags: [projects]
       summary: Получить проект
       responses:
         '200':
@@ -83,8 +112,10 @@ paths:
                 $ref: '#/components/schemas/Project'
         '404':
           $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
     delete:
-      tags: [Projects]
+      tags: [projects]
       summary: Удалить проект
       responses:
         '204':
@@ -96,13 +127,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
 
-  /projects/{project_id}/documents:
+  /api/v1/projects/{project_id}/documents:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
     get:
-      tags: [Documents]
+      tags: [documents]
       summary: Список документов проекта
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -114,8 +147,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentList'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
     post:
-      tags: [Documents]
+      tags: [documents]
       summary: Загрузить документ
       requestBody:
         required: true
@@ -126,8 +163,9 @@ paths:
               required: [file]
               properties:
                 display_name:
-                  type: string
-                  nullable: true
+                  anyOf:
+                    - type: string
+                    - type: 'null'
                 file:
                   type: string
                   format: binary
@@ -138,17 +176,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
+        '400':
+          description: Файл не был передан в запросе
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Проект в процессе переиндексации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '413':
           description: Файл превышает лимит размера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '415':
           description: Формат файла не поддерживается
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
 
-  /projects/{project_id}/documents/{document_id}:
+  /api/v1/projects/{project_id}/documents/{document_id}:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
       - $ref: '#/components/parameters/DocumentId'
     get:
-      tags: [Documents]
+      tags: [documents]
       summary: Метаданные документа
       responses:
         '200':
@@ -159,8 +221,10 @@ paths:
                 $ref: '#/components/schemas/Document'
         '404':
           $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
     delete:
-      tags: [Documents]
+      tags: [documents]
       summary: Удалить документ
       responses:
         '204':
@@ -168,14 +232,20 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Документ занят активной задачей
+          description: Документ занят активной задачей или проект переиндексируется
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
 
-  /projects/{project_id}/documents/{document_id}/text:
+  /api/v1/projects/{project_id}/documents/{document_id}/text:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
       - $ref: '#/components/parameters/DocumentId'
     get:
-      tags: [Content]
+      tags: [documents]
       summary: Извлечённый текст документа
       responses:
         '200':
@@ -184,36 +254,64 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentText'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '409':
           description: Текст ещё недоступен, индексация не завершена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
 
-  /projects/{project_id}/documents/{document_id}/content:
+  /api/v1/projects/{project_id}/documents/{document_id}/content:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
       - $ref: '#/components/parameters/DocumentId'
     get:
-      tags: [Content]
+      tags: [documents]
       summary: Скачать оригинальный файл
       responses:
         '200':
-          description: Оригинальные байты файла
+          description: Оригинальные байты файла; Content-Type равен MIME-типу сохранённого документа
           content:
             application/octet-stream:
               schema:
                 type: string
                 format: binary
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            text/plain:
+              schema:
+                type: string
+                format: binary
+            text/markdown:
+              schema:
+                type: string
+                format: binary
+            text/html:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
         '404':
           $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
 
-  /projects/{project_id}/rag/query:
+  /api/v1/projects/{project_id}/rag/query:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
     post:
-      tags: [RAG]
+      tags: [rag]
       summary: Задать вопрос по документам проекта
-      description: |
-        Если `target_document_ids` не передан, поиск идёт по всем документам проекта
-        со статусом `indexed`.
+      description: Если `target_document_ids` не передан, поиск идёт по всем документам проекта.
       requestBody:
         required: true
         content:
@@ -227,12 +325,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RagAnswer'
+        '400':
+          description: Проект не найден, проект переиндексируется или индекс не готов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
 
-  /projects/{project_id}/retrieval/query:
+  /api/v1/projects/{project_id}/retrieval/query:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
     post:
-      tags: [Retrieval]
+      tags: [retrieval]
       summary: Найти Qdrant points по raw text
       description: |
         Endpoint векторизует переданный `text`, выполняет dense, sparse или hybrid
@@ -253,13 +359,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RetrievalAnswer'
+        '400':
+          description: Проект не найден, проект переиндексируется, индекс не готов или веса некорректны
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
 
-  /projects/{project_id}/analysis/contradictions:
+  /api/v1/projects/{project_id}/analysis/contradictions:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
     get:
-      tags: [Analysis]
+      tags: [analysis]
       summary: Список задач анализа противоречий
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
       responses:
         '200':
           description: Задачи анализа
@@ -267,8 +389,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnalysisJobList'
+        '422':
+          $ref: '#/components/responses/ValidationError'
     post:
-      tags: [Analysis]
+      tags: [analysis]
       summary: Запустить анализ противоречий
       requestBody:
         required: true
@@ -283,15 +407,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnalysisAccepted'
-        '409':
-          description: Базовый документ не готов или проект занят
+        '400':
+          description: Базовый документ не найден или не проиндексирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
 
-  /projects/{project_id}/analysis/contradictions/{job_id}:
+  /api/v1/projects/{project_id}/analysis/contradictions/{job_id}:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
       - $ref: '#/components/parameters/JobId'
     get:
-      tags: [Analysis]
+      tags: [analysis]
       summary: Статус и результат задачи анализа
       responses:
         '200':
@@ -302,6 +432,16 @@ paths:
                 $ref: '#/components/schemas/AnalysisJob'
         '404':
           $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [analysis]
+      summary: Удалить задачу анализа
+      responses:
+        '204':
+          description: Задача удалена, если существовала
+        '422':
+          $ref: '#/components/responses/ValidationError'
 
 components:
   parameters:
@@ -311,21 +451,18 @@ components:
       required: true
       schema:
         type: integer
-        minimum: 1
     DocumentId:
       name: document_id
       in: path
       required: true
       schema:
         type: integer
-        minimum: 1
     JobId:
       name: job_id
       in: path
       required: true
       schema:
         type: integer
-        minimum: 1
     Page:
       name: page
       in: query
@@ -350,29 +487,104 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'
+            $ref: '#/components/schemas/ErrorResponse'
+    ValidationError:
+      description: Ошибка валидации запроса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
 
   schemas:
-    Error:
+    ErrorObject:
       type: object
-      additionalProperties: true
+      required: [code, message]
       properties:
-        detail:
+        code:
           type: string
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorObject'
+
+    ValidationIssue:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        message:
+          type: string
+
+    ValidationErrorResponse:
+      type: object
+      required: [error, issues]
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorObject'
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationIssue'
+
+    Health:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        service:
+          type: string
+          enum: [rag-system-api]
+
+    Liveness:
+      type: object
+      required: [status, service, checks]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        service:
+          type: string
+          enum: [rag-system-api]
+        checks:
+          type: object
+          required: [database, tei, llm, qdrant]
+          properties:
+            database:
+              type: string
+              enum: [ok, error]
+            tei:
+              type: string
+              enum: [ok, error]
+            llm:
+              type: string
+              enum: [ok, error]
+            qdrant:
+              type: string
+              enum: [ok, error]
 
     Project:
       type: object
-      required: [id, name, document_count, created_at, updated_at]
+      required: [id, name, created_at, updated_at]
       properties:
         id:
           type: integer
         name:
           type: string
         description:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         document_count:
           type: integer
+          default: 0
         created_at:
           type: string
           format: date-time
@@ -404,8 +616,9 @@ components:
           minLength: 1
           maxLength: 500
         description:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
 
     Document:
       type: object
@@ -423,10 +636,10 @@ components:
           type: string
         status:
           type: string
-          enum: [uploaded, processing, indexed, failed]
         summary:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         created_at:
           type: string
           format: date-time
@@ -466,10 +679,11 @@ components:
           type: string
           minLength: 1
         target_document_ids:
-          type: array
-          nullable: true
-          items:
-            type: integer
+          anyOf:
+            - type: array
+              items:
+                type: integer
+            - type: 'null'
 
     Citation:
       type: object
@@ -489,8 +703,9 @@ components:
         answer:
           type: string
         warning_message:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         citations:
           type: array
           items:
@@ -504,23 +719,27 @@ components:
           type: string
           minLength: 1
         target_document_ids:
-          type: array
-          nullable: true
-          items:
-            type: integer
+          anyOf:
+            - type: array
+              items:
+                type: integer
+            - type: 'null'
         dense_weight:
-          type: number
-          minimum: 0
-          nullable: true
+          anyOf:
+            - type: number
+              minimum: 0
+            - type: 'null'
         sparse_weight:
-          type: number
-          minimum: 0
-          nullable: true
+          anyOf:
+            - type: number
+              minimum: 0
+            - type: 'null'
         limit:
-          type: integer
-          minimum: 1
-          maximum: 100
-          nullable: true
+          anyOf:
+            - type: integer
+              minimum: 1
+              maximum: 100
+            - type: 'null'
         include_text:
           type: boolean
           default: true
@@ -535,36 +754,46 @@ components:
         point_id:
           type: string
         score:
-          type: number
-          nullable: true
+          anyOf:
+            - type: number
+            - type: 'null'
         distance:
-          type: number
-          nullable: true
+          anyOf:
+            - type: number
+            - type: 'null'
         document_id:
-          type: integer
-          nullable: true
+          anyOf:
+            - type: integer
+            - type: 'null'
         chunk_id:
-          type: integer
-          nullable: true
+          anyOf:
+            - type: integer
+            - type: 'null'
         chunk_order:
-          type: integer
-          nullable: true
+          anyOf:
+            - type: integer
+            - type: 'null'
         char_start:
-          type: integer
-          nullable: true
+          anyOf:
+            - type: integer
+            - type: 'null'
         char_end:
-          type: integer
-          nullable: true
+          anyOf:
+            - type: integer
+            - type: 'null'
         text_preview:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         text:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         payload:
-          type: object
-          nullable: true
-          additionalProperties: true
+          anyOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
 
     RetrievalAnswer:
       type: object
@@ -576,7 +805,6 @@ components:
           type: string
         retrieval_mode:
           type: string
-          enum: [dense, sparse, hybrid]
         dense_weight:
           type: number
         sparse_weight:
@@ -596,12 +824,13 @@ components:
       properties:
         base_document_id:
           type: integer
-          minimum: 1
+          exclusiveMinimum: 0
         target_document_ids:
-          type: array
-          nullable: true
-          items:
-            type: integer
+          anyOf:
+            - type: array
+              items:
+                type: integer
+            - type: 'null'
 
     AnalysisAccepted:
       type: object
@@ -614,8 +843,9 @@ components:
         poll_url:
           type: string
         warning_message:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
 
     AnalysisJob:
       type: object
@@ -625,18 +855,55 @@ components:
           type: integer
         status:
           type: string
-          enum: [queued, processing, completed, failed]
         poll_url:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         warning_message:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         results:
-          nullable: true
+          anyOf:
+            - {}
+            - type: 'null'
         error_message:
+          anyOf:
+            - type: string
+            - type: 'null'
+
+    AnalysisJobListItem:
+      type: object
+      required: [id, project_id, base_document_id, target_document_ids, status, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        project_id:
+          type: integer
+        base_document_id:
+          type: integer
+        target_document_ids:
+          type: array
+          items:
+            type: integer
+        status:
           type: string
-          nullable: true
+        created_at:
+          type: string
+        updated_at:
+          type: string
+        completed_at:
+          anyOf:
+            - type: string
+            - type: 'null'
+        warning_message:
+          anyOf:
+            - type: string
+            - type: 'null'
+        results:
+          anyOf:
+            - {}
+            - type: 'null'
 
     AnalysisJobList:
       type: object
@@ -645,5 +912,4 @@ components:
         items:
           type: array
           items:
-            type: object
-            additionalProperties: true
+            $ref: '#/components/schemas/AnalysisJobListItem'

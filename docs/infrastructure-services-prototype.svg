@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Инфраструктурные сервисы прототипа</title>
+  <desc id="desc">Схема инфраструктурных сервисов прототипа RAG-системы: PostgreSQL, Qdrant, Docling, TEI, vLLM, Graylog и MinIO.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#334155"/>
+    </marker>
+    <style>
+      .bg { fill: #f8fafc; }
+      .panel { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; }
+      .core { fill: #eef6ff; stroke: #2563eb; stroke-width: 3; }
+      .data { fill: #ecfdf5; stroke: #059669; stroke-width: 3; }
+      .ai { fill: #fff7ed; stroke: #ea580c; stroke-width: 3; }
+      .ops { fill: #f5f3ff; stroke: #7c3aed; stroke-width: 3; }
+      .storage { fill: #fefce8; stroke: #ca8a04; stroke-width: 3; }
+      .title { font: 700 38px Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 20px Arial, sans-serif; fill: #475569; }
+      .label { font: 700 26px Arial, sans-serif; fill: #0f172a; }
+      .small { font: 400 18px Arial, sans-serif; fill: #334155; }
+      .tiny { font: 400 16px Arial, sans-serif; fill: #475569; }
+      .group { font: 700 18px Arial, sans-serif; fill: #334155; letter-spacing: .04em; }
+      .line { stroke: #334155; stroke-width: 2.4; fill: none; marker-end: url(#arrow); }
+      .softline { stroke: #64748b; stroke-width: 2; fill: none; marker-end: url(#arrow); stroke-dasharray: 8 7; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1600" height="1000"/>
+  <rect x="48" y="46" width="1504" height="908" rx="28" class="panel"/>
+
+  <text x="800" y="105" text-anchor="middle" class="title">Инфраструктурные сервисы прототипа</text>
+  <text x="800" y="142" text-anchor="middle" class="subtitle">Docker Compose окружение для загрузки документов, индексации, поиска, генерации ответов и мониторинга</text>
+
+  <rect x="610" y="360" width="380" height="220" rx="26" class="core"/>
+  <text x="800" y="420" text-anchor="middle" class="label">Прототип RAG-системы</text>
+  <text x="800" y="462" text-anchor="middle" class="small">rag-system-api</text>
+  <text x="800" y="493" text-anchor="middle" class="small">rag-system-worker</text>
+  <text x="800" y="533" text-anchor="middle" class="tiny">оркестрация задач, API, индексация, анализ</text>
+
+  <text x="185" y="222" text-anchor="middle" class="group">ДАННЫЕ И ПОИСК</text>
+  <rect x="105" y="250" width="360" height="128" rx="20" class="data"/>
+  <text x="285" y="300" text-anchor="middle" class="label">PostgreSQL</text>
+  <text x="285" y="336" text-anchor="middle" class="small">хранение состояния приложения</text>
+
+  <rect x="105" y="435" width="360" height="140" rx="20" class="data"/>
+  <text x="285" y="488" text-anchor="middle" class="label">Qdrant</text>
+  <text x="285" y="524" text-anchor="middle" class="small">векторное хранилище</text>
+  <text x="285" y="552" text-anchor="middle" class="small">и гибридный поиск</text>
+
+  <text x="1395" y="222" text-anchor="middle" class="group">AI-СЕРВИСЫ</text>
+  <rect x="1135" y="250" width="360" height="128" rx="20" class="ai"/>
+  <text x="1315" y="300" text-anchor="middle" class="label">TEI</text>
+  <text x="1315" y="336" text-anchor="middle" class="small">локальный сервис эмбеддингов</text>
+
+  <rect x="1135" y="435" width="360" height="140" rx="20" class="ai"/>
+  <text x="1315" y="488" text-anchor="middle" class="label">vLLM</text>
+  <text x="1315" y="524" text-anchor="middle" class="small">локальный OpenAI-совместимый</text>
+  <text x="1315" y="552" text-anchor="middle" class="small">LLM API</text>
+
+  <text x="800" y="694" text-anchor="middle" class="group">ОБРАБОТКА, ХРАНЕНИЕ И НАБЛЮДАЕМОСТЬ</text>
+  <rect x="145" y="735" width="360" height="128" rx="20" class="storage"/>
+  <text x="325" y="785" text-anchor="middle" class="label">Docling</text>
+  <text x="325" y="821" text-anchor="middle" class="small">извлечение текста из документов</text>
+
+  <rect x="620" y="735" width="360" height="128" rx="20" class="storage"/>
+  <text x="800" y="785" text-anchor="middle" class="label">MinIO</text>
+  <text x="800" y="821" text-anchor="middle" class="small">S3-совместимый профиль</text>
+  <text x="800" y="849" text-anchor="middle" class="small">файлового хранилища</text>
+
+  <rect x="1095" y="735" width="360" height="128" rx="20" class="ops"/>
+  <text x="1275" y="785" text-anchor="middle" class="label">Graylog</text>
+  <text x="1275" y="821" text-anchor="middle" class="small">централизованный просмотр логов</text>
+
+  <path class="line" d="M610 420 C540 380 500 340 467 322"/>
+  <path class="line" d="M610 500 C540 506 512 506 468 506"/>
+  <path class="line" d="M990 420 C1060 380 1100 340 1133 322"/>
+  <path class="line" d="M990 500 C1060 506 1090 506 1133 506"/>
+  <path class="line" d="M700 580 C610 640 520 705 400 734"/>
+  <path class="line" d="M800 580 L800 733"/>
+  <path class="softline" d="M910 580 C1015 650 1120 700 1220 734"/>
+
+  <text x="548" y="356" text-anchor="middle" class="tiny">метаданные, статусы, задачи</text>
+  <text x="548" y="535" text-anchor="middle" class="tiny">dense + sparse поиск</text>
+  <text x="1060" y="356" text-anchor="middle" class="tiny">эмбеддинги</text>
+  <text x="1064" y="535" text-anchor="middle" class="tiny">ответы и анализ</text>
+  <text x="535" y="690" text-anchor="middle" class="tiny">парсинг файлов</text>
+  <text x="835" y="675" text-anchor="middle" class="tiny">объекты файлов</text>
+  <text x="1085" y="690" text-anchor="middle" class="tiny">логи сервисов</text>
+
+  <rect x="92" y="900" width="1416" height="30" rx="15" fill="#f1f5f9"/>
+  <text x="800" y="921" text-anchor="middle" class="tiny">Сервисы могут запускаться локально или отключаться профилями Docker Compose; схема отражает инфраструктурные роли компонентов прототипа.</text>
+</svg>

@@ -1,5 +1,5 @@
 """
-End-to-end integration test for the Mimir API.
+End-to-end integration test for the RAG System API.
 
 Usage:
     make up          # start the stack first
@@ -98,7 +98,7 @@ async def wait_for_analysis(client: httpx.AsyncClient, project_id: int, job_id: 
 
 def assert_retrieval_response(data: dict, project_id: int, expected_limit: int) -> list[dict]:
     assert data["query_text"]
-    assert data["collection_name"] == f"mimir_project_{project_id}"
+    assert data["collection_name"] == f"rag-system-project_{project_id}"
     assert data["retrieval_mode"] in {"dense", "sparse", "hybrid"}
     assert data["dense_weight"] >= 0
     assert data["sparse_weight"] >= 0

@@ -1,0 +1,32 @@
+@startuml
+title Диаграмма развертывания RAG-системы
+
+top to bottom direction
+skinparam packageStyle rectangle
+
+node главный_сервер {
+    node "Клиентское приложение" as container <<Контейнер>> {
+
+    }
+    node "API маршрутизатор" as container <<Контейнер>> {
+
+    }
+    node "Обработчик событий" as container <<Контейнер>> {
+
+    }
+    node "БД Postgres" as container <<Контейнер>> {
+
+    }
+    node "БД Qdrant" as container <<Контейнер>> {
+
+    }
+    node "Объектное хранилище Minio" as container <<Контейнер>> {
+
+    }
+
+}
+node "сервер(а)_облачного_провайдера"
+
+
+
+@enduml

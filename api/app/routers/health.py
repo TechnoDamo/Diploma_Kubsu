@@ -7,12 +7,12 @@ router = APIRouter(tags=["health"])
 
 @router.get("/healthz")
 async def health():
-    return {"status": "ok", "service": "mimir-api"}
+    return {"status": "ok", "service": "rag-system-api"}
 
 
 @router.get("/healthz/ready")
 async def readiness():
-    return {"status": "ok", "service": "mimir-api"}
+    return {"status": "ok", "service": "rag-system-api"}
 
 
 @router.get("/healthz/live")
@@ -52,6 +52,6 @@ async def liveness(
 
     return {
         "status": "ok" if all_ok else "degraded",
-        "service": "mimir-api",
+        "service": "rag-system-api",
         "checks": checks,
     }

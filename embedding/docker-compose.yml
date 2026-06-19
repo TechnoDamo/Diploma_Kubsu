@@ -2,7 +2,7 @@ services:
   embedding:
     profiles: ["local-embedding"]
     image: ${TEI_IMAGE:-ghcr.io/huggingface/text-embeddings-inference:cpu-1.5}
-    container_name: mimir-embedding
+    container_name: rag-system-embedding
     command:
       - --model-id
       - /data/${EMBEDDING_HF_REPO:-minishlab/potion-base-32M}
@@ -19,9 +19,9 @@ services:
     volumes:
       - ${EMBEDDING_MODELS_DIR:-${HOME}/.cache/huggingface/hub}:/data
     networks:
-      - mimir
+      - rag-system
 
 networks:
-  mimir:
-    name: mimir
+  rag-system:
+    name: rag-system
     driver: bridge

@@ -4,11 +4,11 @@
 LAYOUT_WITH_LEGEND()
 LAYOUT_LEFT_RIGHT()
 
-title Mimir — C4 Container Diagram
+title RAG System — C4 Container Diagram
 
 Person(user, "Пользователь", "Загружает документы, задаёт вопросы и запускает анализ противоречий.")
 
-System_Boundary(mimir, "Mimir") {
+System_Boundary(rag_system, "RAG System") {
   Container(frontend, "Frontend", "Next.js, React, Tailwind CSS", "Пользовательский интерфейс: проекты, документы, RAG-запросы, результаты анализа.")
   Container(api, "FastAPI API", "Python 3.12, FastAPI", "HTTP API: проекты, документы, загрузка файлов, RAG-запросы, статусы задач.")
   Container(worker, "Worker", "Python asyncio", "Фоновая обработка: индексация документов и анализ противоречий.")

@@ -1,4 +1,4 @@
-# Mimir API
+# RAG System API
 
 `api/` содержит FastAPI-приложение и фоновый worker. API принимает HTTP-запросы,
 сохраняет документы и создаёт задания, а worker выполняет долгие операции:
@@ -205,7 +205,7 @@ curl -fsS -X POST "${API_BASE}/projects/${PROJECT_ID}/retrieval/query" \
 Получить первые points документа:
 
 ```bash
-curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/scroll" \
+curl -fsS -X POST "http://localhost:6333/collections/rag-system-project_166/points/scroll" \
   -H 'Content-Type: application/json' \
   -d '{
     "filter": {
@@ -224,7 +224,7 @@ curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/sc
 Dense recommend search от существующего point:
 
 ```bash
-curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/query" \
+curl -fsS -X POST "http://localhost:6333/collections/rag-system-project_166/points/query" \
   -H 'Content-Type: application/json' \
   -d '{
     "query": {"recommend": {"positive": ["POINT_ID"]}},
@@ -238,7 +238,7 @@ curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/qu
 Sparse search по BM25 sparse-вектору:
 
 ```bash
-curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/query" \
+curl -fsS -X POST "http://localhost:6333/collections/rag-system-project_166/points/query" \
   -H 'Content-Type: application/json' \
   -d '{
     "query": {"indices": [100, 200], "values": [1.0, 0.7]},
@@ -252,7 +252,7 @@ curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/qu
 Raw Qdrant hybrid fusion для проверки самой коллекции:
 
 ```bash
-curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/query" \
+curl -fsS -X POST "http://localhost:6333/collections/rag-system-project_166/points/query" \
   -H 'Content-Type: application/json' \
   -d '{
     "prefetch": [
@@ -274,8 +274,8 @@ curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/qu
   }'
 ```
 
-Важно: последний пример повторяет hybrid-путь Mimir на уровне Qdrant. Весовые
-настройки Mimir (`*_dense_weight` / `*_sparse_weight`) передаются как массив
+Важно: последний пример повторяет hybrid-путь RAG System на уровне Qdrant. Весовые
+настройки RAG System (`*_dense_weight` / `*_sparse_weight`) передаются как массив
 `rrf.weights` в том же порядке, что и `prefetch`: dense затем sparse. Для этого
 локальный Qdrant должен быть версии `1.17.0` или новее.
 
@@ -316,7 +316,7 @@ uv run pytest -v -s tests/
 
 Тест создаёт проект, загружает документы из `api/scripts/test_docs`, ждёт индексации,
 делает RAG-запрос и запускает анализ противоречий. Если тест зависает на статусе
-`uploaded`, сначала проверьте логи `mimir-worker`: чаще всего worker занят старой
+`uploaded`, сначала проверьте логи `rag-system-worker`: чаще всего worker занят старой
 задачей или не может достучаться до embedding/LLM сервиса.
 
 ## Диагностика
@@ -332,5 +332,5 @@ curl -s http://localhost:8080/healthz/live
 curl -s 'http://localhost:8080/api/v1/projects/1/documents?limit=100'
 
 # Логи worker из корня репозитория
-docker logs --tail 100 mimir-worker
+docker logs --tail 100 rag-system-worker
 ```

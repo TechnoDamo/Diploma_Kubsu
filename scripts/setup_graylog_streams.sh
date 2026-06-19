@@ -1,5 +1,5 @@
 #!/bin/sh
-# Set up Graylog streams for Mimir
+# Set up Graylog streams for RAG System
 # Run after Graylog is up: curl -s http://localhost:19000/api/system/lbstatus
 
 GRAYLOG_URL="http://localhost:19000"
@@ -50,20 +50,20 @@ create_stream() {
 wait_for_graylog || exit 1
 
 # Create streams with rules
-create_stream "Mimir API Requests" "HTTP request/response logs" \
+create_stream "RAG System API Requests" "HTTP request/response logs" \
 "logger_name|1|app.main"
 
-create_stream "Mimir Document Processing" "Document upload and indexing operations" \
+create_stream "RAG System Document Processing" "Document upload and indexing operations" \
 "logger_name|1|app.services.documents
 logger_name|1|app.services.indexing"
 
-create_stream "Mimir Analysis" "Contradiction analysis jobs" \
+create_stream "RAG System Analysis" "Contradiction analysis jobs" \
 "logger_name|1|app.services.analysis"
 
-create_stream "Mimir Errors" "All error-level events" \
+create_stream "RAG System Errors" "All error-level events" \
 "level|1|ERROR"
 
-create_stream "Mimir All" "All Mimir application logs" \
-"facility|1|mimir"
+create_stream "RAG System All" "All RAG System application logs" \
+"facility|1|rag_system"
 
 echo "Graylog streams configured"

@@ -1,0 +1,63 @@
+@startuml
+title Верхнеуровневый процесс RAG-запроса
+
+actor "Пользователь" as User
+participant "Клиентское приложение" as Client
+participant "Серверное приложение" as Server
+participant "Модель эмбеддингов" as Embeddings
+database "Векторная база данных" as VectorDB
+database "Реляционная база данных" as RelDB
+participant "Большая языковая модель" as LLM
+
+group Формирование запроса пользователем
+    User -> Client: Вводит вопрос\nи выбирает документы
+    activate Client
+
+    Client -> Server: Отправляет RAG-запрос
+    activate Server
+end
+
+group Подготовка поискового представления запроса
+    Server -> RelDB: Получает параметры поиска
+    activate RelDB
+    RelDB --> Server: Параметры поиска
+    deactivate RelDB
+
+    Server -> Embeddings: Создаёт плотный вектор вопроса
+    activate Embeddings
+    Embeddings --> Server: Плотный вектор вопроса
+    deactivate Embeddings
+
+    Server -> Server: Создаёт разреженное\nпредставление вопроса
+end
+
+group Поиск релевантных фрагментов
+    Server -> VectorDB: Ищет релевантные\nфрагменты документов
+    activate VectorDB
+    VectorDB --> Server: Найденные фрагменты
+    deactivate VectorDB
+
+    Server -> RelDB: Получает сведения\nоб источниках
+    activate RelDB
+    RelDB --> Server: Метаданные источников
+    deactivate RelDB
+end
+
+group Формирование ответа
+    Server -> Server: Формирует контекст\nдля языковой модели
+
+    Server -> LLM: Передаёт вопрос\nи найденный контекст
+    activate LLM
+    LLM --> Server: Сформированный ответ
+    deactivate LLM
+end
+
+group Возврат результата пользователю
+    Server --> Client: Ответ и список источников
+    deactivate Server
+
+    Client --> User: Показывает ответ\nи источники
+    deactivate Client
+end
+
+@enduml

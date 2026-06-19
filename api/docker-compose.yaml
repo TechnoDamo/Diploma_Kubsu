@@ -1,9 +1,9 @@
 services:
   api:
-    image: ${API_IMAGE:-mimir-api:local}
+    image: ${API_IMAGE:-rag-system-api:local}
     build:
       context: .
-    container_name: mimir-api
+    container_name: rag-system-api
     restart: unless-stopped
     depends_on:
       postgres:
@@ -21,7 +21,7 @@ services:
       HTTP_HOST: 0.0.0.0
       HTTP_PORT: 8080
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-*}
-      POSTGRES_DSN: ${POSTGRES_DSN:-postgres://mimir:mimir@postgres:5432/mimir_db}
+      POSTGRES_DSN: ${POSTGRES_DSN:-postgres://rag_system:rag_system@postgres:5432/rag_system_db}
       POSTGRES_MAX_CONNS: ${POSTGRES_MAX_CONNS:-10}
       POSTGRES_MIN_CONNS: ${POSTGRES_MIN_CONNS:-2}
       WORKER_POLL_INTERVAL: ${WORKER_POLL_INTERVAL_SECONDS:-3}
@@ -34,7 +34,7 @@ services:
       UPLOAD_MAX_SIZE_MB: ${UPLOAD_MAX_SIZE_MB:-25}
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       QDRANT_API_KEY: ${QDRANT_API_KEY:-}
-      QDRANT_COLLECTION_NAME: ${QDRANT_COLLECTION_NAME:-mimir_project}
+      QDRANT_COLLECTION_NAME: ${QDRANT_COLLECTION_NAME:-rag-system-project}
       QDRANT_ON_DISK_PAYLOAD: ${QDRANT_ON_DISK_PAYLOAD:-true}
       SPARSE_VECTOR_ENABLED: ${SPARSE_VECTOR_ENABLED:-true}
       SPARSE_MODEL: ${SPARSE_MODEL:-Qdrant/bm25}
@@ -81,14 +81,14 @@ services:
     volumes:
       - ./app:/app/app:delegated
       - ./prompts:/app/prompts
-      - mimir_files:/app/storage
+      - rag-system-files:/app/storage
       - hf_cache:/root/.cache/huggingface
     networks:
-      - mimir
+      - rag-system
 
   worker:
-    image: ${API_IMAGE:-mimir-api:local}
-    container_name: mimir-worker
+    image: ${API_IMAGE:-rag-system-api:local}
+    container_name: rag-system-worker
     restart: unless-stopped
     depends_on:
       postgres:
@@ -102,7 +102,7 @@ services:
       FASTEMBED_CACHE_PATH: /root/.cache/huggingface
       APP_ENV: ${APP_ENV:-production}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      POSTGRES_DSN: ${POSTGRES_DSN:-postgres://mimir:mimir@postgres:5432/mimir_db}
+      POSTGRES_DSN: ${POSTGRES_DSN:-postgres://rag_system:rag_system@postgres:5432/rag_system_db}
       POSTGRES_MAX_CONNS: ${POSTGRES_MAX_CONNS:-10}
       POSTGRES_MIN_CONNS: ${POSTGRES_MIN_CONNS:-2}
       FILES_ROOT_DIR: /app/storage
@@ -113,7 +113,7 @@ services:
       UPLOAD_MAX_SIZE_MB: ${UPLOAD_MAX_SIZE_MB:-25}
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       QDRANT_API_KEY: ${QDRANT_API_KEY:-}
-      QDRANT_COLLECTION_NAME: ${QDRANT_COLLECTION_NAME:-mimir_project}
+      QDRANT_COLLECTION_NAME: ${QDRANT_COLLECTION_NAME:-rag-system-project}
       QDRANT_ON_DISK_PAYLOAD: ${QDRANT_ON_DISK_PAYLOAD:-true}
       SPARSE_VECTOR_ENABLED: ${SPARSE_VECTOR_ENABLED:-true}
       SPARSE_MODEL: ${SPARSE_MODEL:-Qdrant/bm25}
@@ -159,16 +159,16 @@ services:
     volumes:
       - ./app:/app/app:delegated
       - ./prompts:/app/prompts
-      - mimir_files:/app/storage
+      - rag-system-files:/app/storage
       - hf_cache:/root/.cache/huggingface
     networks:
-      - mimir
+      - rag-system
 
 volumes:
-  mimir_files:
+  rag-system-files:
   hf_cache:
 
 networks:
-  mimir:
-    name: mimir
+  rag-system:
+    name: rag-system
     driver: bridge

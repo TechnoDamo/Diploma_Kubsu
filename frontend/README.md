@@ -1,4 +1,4 @@
-# Mimir Frontend
+# RAG System Frontend
 
 Frontend — одностраничный интерфейс на Next.js для работы с проектами, документами,
 RAG-запросами и анализом противоречий. Он не поднимается корневым Docker Compose:

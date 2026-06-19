@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     def http_max_upload_size_bytes(self) -> int:
         return self.upload_max_size_mb * 1024 * 1024
 
-    postgres_dsn: str = "postgres://mimir:mimir@localhost:5432/mimir_db?sslmode=disable"
+    postgres_dsn: str = "postgres://rag_system:rag_system@localhost:5432/rag_system_db?sslmode=disable"
     postgres_max_conns: int = 10
     postgres_min_conns: int = 2
 
@@ -40,11 +40,11 @@ class Settings(BaseSettings):
     minio_endpoint: str = "http://minio:9000"
     minio_root_user: str = "minioadmin"
     minio_root_password: str = "minioadmin"
-    minio_bucket: str = "mimir-files"
+    minio_bucket: str = "rag-system-files"
     s3_endpoint_url: str = ""
     s3_access_key_id: str = ""
     s3_secret_access_key: str = ""
-    s3_bucket: str = "mimir-files"
+    s3_bucket: str = "rag-system-files"
     s3_region: str = "us-east-1"
 
     llm_base_url: str = "https://api.deepseek.com"
@@ -71,7 +71,7 @@ class Settings(BaseSettings):
 
     qdrant_url: str = "http://qdrant:6333"
     qdrant_api_key: str = ""
-    qdrant_collection_name: str = "mimir_project"
+    qdrant_collection_name: str = "rag-system-project"
     qdrant_on_disk_payload: bool = True
 
     sparse_vector_enabled: bool = True

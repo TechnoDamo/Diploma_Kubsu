@@ -1,7 +1,7 @@
 [project]
-name = "mimir-api"
+name = "rag-system-api"
 version = "1.0.0"
-description = "Mimir - Intelligent RAG System with Cross-Document Analysis"
+description = "RAG System - Intelligent RAG System with Cross-Document Analysis"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",

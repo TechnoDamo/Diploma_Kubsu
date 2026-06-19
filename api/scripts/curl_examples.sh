@@ -140,12 +140,12 @@ curl -fsS -X POST "${API_BASE}/projects/${PROJECT_ID}/retrieval/query" \
 # Replace collection/project/document/point/vector values with real ones.
 # The API reads RAG_DENSE_WEIGHT/RAG_SPARSE_WEIGHT and
 # CONTRADICTION_DENSE_WEIGHT/CONTRADICTION_SPARSE_WEIGHT to decide which
-# retrieval branches participate. With both branches enabled, Mimir uses
+# retrieval branches participate. With both branches enabled, RAG System uses
 # Qdrant query_points prefetch + weighted RRF fusion.
 ###############################################################################
 
 # Scroll points for a document. Existing collections may only have chunk_id order.
-curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/scroll" \
+curl -fsS -X POST "http://localhost:6333/collections/rag-system-project_166/points/scroll" \
   -H 'Content-Type: application/json' \
   -d '{
     "filter": {
@@ -161,7 +161,7 @@ curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/sc
   }' | python -m json.tool --no-ensure-ascii
 
 # Dense recommend search from an existing point id into a target document.
-curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/query" \
+curl -fsS -X POST "http://localhost:6333/collections/rag-system-project_166/points/query" \
   -H 'Content-Type: application/json' \
   -d '{
     "query": {"recommend": {"positive": ["POINT_ID"]}},
@@ -172,7 +172,7 @@ curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/qu
   }' | python -m json.tool --no-ensure-ascii
 
 # Sparse search. Use real indices/values from a generated BM25 sparse vector.
-curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/query" \
+curl -fsS -X POST "http://localhost:6333/collections/rag-system-project_166/points/query" \
   -H 'Content-Type: application/json' \
   -d '{
     "query": {"indices": [100, 200], "values": [1.0, 0.7]},
@@ -182,9 +182,9 @@ curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/qu
     "with_payload": true
   }' | python -m json.tool --no-ensure-ascii
 
-# Raw Qdrant hybrid fusion. This mirrors Mimir's hybrid backend path when both
+# Raw Qdrant hybrid fusion. This mirrors RAG System's hybrid backend path when both
 # dense and sparse branches are enabled. Requires Qdrant 1.17.0+.
-curl -fsS -X POST "http://localhost:6333/collections/mimir_project_166/points/query" \
+curl -fsS -X POST "http://localhost:6333/collections/rag-system-project_166/points/query" \
   -H 'Content-Type: application/json' \
   -d '{
     "prefetch": [

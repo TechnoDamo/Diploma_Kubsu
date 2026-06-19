@@ -1,7 +1,7 @@
 DOCKER_BUILDKIT ?= 1
 COMPOSE ?= docker compose
 COMPOSE_FILE ?= docker-compose.yml
-API_IMAGE ?= mimir-api:local
+API_IMAGE ?= rag-system-api:local
 
 LLM ?= cloud
 EMBEDDING ?= cloud
@@ -72,7 +72,7 @@ ENV_ARGS += PROMPTS_DIR=/app/prompts
 DOCKER_ENV := DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) API_IMAGE=$(API_IMAGE)
 
 help:
-	@echo "Mimir — Интеллектуальная RAG-система"
+	@echo "Интеллектуальная RAG-система"
 	@echo ""
 	@echo "make up                       — дефолтный стек (LLM/embedding=cloud, остальное=local, Graylog=on)"
 	@echo "make fast-up                  — быстрый стек без Graylog"
@@ -134,8 +134,8 @@ test:
 	cd api && uv run pytest -v -s tests/
 
 clean-db:
-	docker exec mimir-postgres psql -U mimir -d mimir_db -c "DELETE FROM analysis.analysis_job_targets; DELETE FROM analysis.analysis_jobs; DELETE FROM documents.document_processing_jobs; DELETE FROM documents.document_history; DELETE FROM documents.chunks; DELETE FROM documents.documents; DELETE FROM documents.project_index_configs; DELETE FROM documents.projects;" 2>/dev/null || true
-	docker exec mimir-api python -c "import httpx; r=httpx.get('http://qdrant:6333/collections'); [httpx.delete(f'http://qdrant:6333/collections/{c[\"name\"]}') for c in r.json()['result']['collections']]" 2>/dev/null || true
-	docker exec mimir-api sh -c 'rm -rf /app/storage/2*' 2>/dev/null || true
-	docker exec mimir-worker sh -c 'rm -rf /app/storage/2*' 2>/dev/null || true
+	docker exec rag-system-postgres psql -U rag_system -d rag_system_db -c "DELETE FROM analysis.analysis_job_targets; DELETE FROM analysis.analysis_jobs; DELETE FROM documents.document_processing_jobs; DELETE FROM documents.document_history; DELETE FROM documents.chunks; DELETE FROM documents.documents; DELETE FROM documents.project_index_configs; DELETE FROM documents.projects;" 2>/dev/null || true
+	docker exec rag-system-api python -c "import httpx; r=httpx.get('http://qdrant:6333/collections'); [httpx.delete(f'http://qdrant:6333/collections/{c[\"name\"]}') for c in r.json()['result']['collections']]" 2>/dev/null || true
+	docker exec rag-system-api sh -c 'rm -rf /app/storage/2*' 2>/dev/null || true
+	docker exec rag-system-worker sh -c 'rm -rf /app/storage/2*' 2>/dev/null || true
 	@echo "DBs cleared"

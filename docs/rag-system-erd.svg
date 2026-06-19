@@ -1,0 +1,374 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3508" height="2480" viewBox="0 0 3508 2480">
+<defs>
+<marker id="arrow" markerWidth="18" markerHeight="18" refX="15" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M2,2 L15,6 L2,10 Z" fill="#334155"/></marker>
+<filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#0f172a" flood-opacity="0.14"/></filter>
+<style>
+
+        .bg { fill: #ffffff; }
+        .band { fill: #f8fafc; stroke: #dbe3ef; stroke-width: 2; }
+        .band-title { font: 700 34px Inter, Arial, sans-serif; fill: #334155; letter-spacing: .5px; }
+        .title { font: 800 58px Inter, Arial, sans-serif; fill: #0f172a; }
+        .subtitle { font: 400 28px Inter, Arial, sans-serif; fill: #475569; }
+        .card { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2.4; filter: url(#shadow); }
+        .schema { font: 600 20px Inter, Arial, sans-serif; fill: rgba(255,255,255,.82); text-transform: uppercase; letter-spacing: 1.5px; }
+        .table-title { font: 800 31px Inter, Arial, sans-serif; fill: #ffffff; }
+        .row-alt { fill: #f8fafc; }
+        .col-name { font: 600 24px Inter, Arial, sans-serif; fill: #111827; }
+        .col-type { font: 500 22px Inter, Arial, sans-serif; fill: #64748b; }
+        .tag { stroke-width: 1.5; }
+        .pk { fill: #fef3c7; stroke: #d97706; }
+        .fk { fill: #dbeafe; stroke: #2563eb; }
+        .ext { fill: #dcfce7; stroke: #16a34a; }
+        .tag-text { font: 800 15px Inter, Arial, sans-serif; fill: #1f2937; }
+        .rel { fill: none; stroke-width: 4; stroke-linecap: round; marker-end: url(#arrow); opacity: .82; }
+        .rel-label { font: 700 19px Inter, Arial, sans-serif; fill: #334155; paint-order: stroke; stroke: white; stroke-width: 6px; stroke-linejoin: round; }
+        .external { fill: #fff7ed; stroke: #fed7aa; stroke-width: 2.4; filter: url(#shadow); }
+        .external-title { font: 800 28px Inter, Arial, sans-serif; fill: #9a3412; }
+        .external-body { font: 500 22px Inter, Arial, sans-serif; fill: #7c2d12; }
+        .legend-title { font: 800 26px Inter, Arial, sans-serif; fill: #0f172a; }
+        .legend { font: 500 22px Inter, Arial, sans-serif; fill: #475569; }
+        
+</style>
+</defs>
+<rect width="100%" height="100%" class="bg"/>
+<text x="120" y="105" class="title" text-anchor="start">RAG System: PostgreSQL Data Model</text>
+<text x="120" y="152" class="subtitle" text-anchor="start">Print-ready ERD from live Postgres: 8 application tables plus Alembic migration metadata.</text>
+<rect x="86" y="210" width="2055" height="2170" rx="32" class="band"/>
+<rect x="2180" y="210" width="1242" height="2170" rx="32" class="band"/>
+<text x="130" y="258" class="band-title" text-anchor="start">documents schema</text>
+<text x="2225" y="258" class="band-title" text-anchor="start">analysis schema</text>
+<text x="2775" y="1950" class="band-title" text-anchor="start">public metadata</text>
+<path d="M 950 816 C 950 626, 1170 626, 1170 436" class="rel" stroke="#2563eb"/>
+<path d="M 1500 625 C 1507 625, 1507 612, 1515 612" class="rel" stroke="#0f766e"/>
+<path d="M 1120 927 C 1035 927, 1035 816, 950 816" class="rel" stroke="#0f766e"/>
+<path d="M 1500 1295 C 1500 1262, 1500 1262, 1500 1229" class="rel" stroke="#0891b2"/>
+<path d="M 1500 1295 C 1500 953, 1515 953, 1515 612" class="rel" stroke="#0891b2"/>
+<path d="M 1500 1295 C 1020 1295, 1020 1097, 540 1097" class="rel" stroke="#0891b2"/>
+<path d="M 540 1625 C 540 1118, 1515 1118, 1515 612" class="rel" stroke="#7c3aed"/>
+<path d="M 540 1625 C 1020 1625, 1020 1229, 1500 1229" class="rel" stroke="#7c3aed"/>
+<path d="M 540 1625 C 540 1361, 540 1361, 540 1097" class="rel" stroke="#7c3aed"/>
+<path d="M 2420 1510 C 1960 1510, 1960 1229, 1500 1229" class="rel" stroke="#ea580c"/>
+<path d="M 2225 841 C 2225 638, 1860 638, 1860 436" class="rel" stroke="#16a34a"/>
+<path d="M 2225 841 C 2052 841, 2052 927, 1880 927" class="rel" stroke="#16a34a"/>
+<path d="M 3090 1360 C 2847 1360, 2847 1122, 2605 1122" class="rel" stroke="#15803d"/>
+<path d="M 2830 1452 C 2355 1452, 2355 927, 1880 927" class="rel" stroke="#15803d"/>
+<g>
+<rect x="2010" y="1115" width="610" height="165" rx="20" class="external"/>
+<rect x="2010" y="1115" width="12" height="165" rx="6" fill="#ea580c"/>
+<text x="2044" y="1161" class="external-title" text-anchor="start">External file storage</text>
+<text x="2044" y="1203" class="external-body" text-anchor="start">documents.storage_key</text>
+</g>
+<path d="M 1880 830 C 1990 900, 2010 1030, 2010 1190" class="rel" stroke="#ea580c"/>
+<g>
+<rect x="1960" y="1970" width="660" height="165" rx="20" class="external"/>
+<rect x="1960" y="1970" width="12" height="165" rx="6" fill="#0891b2"/>
+<text x="1994" y="2016" class="external-title" text-anchor="start">Qdrant vector store</text>
+<text x="1994" y="2058" class="external-body" text-anchor="start">chunks.qdrant_point_id</text>
+</g>
+<path d="M 1880 1548 C 1990 1670, 1970 1880, 1960 2055" class="rel" stroke="#0891b2"/>
+<g class="table" id="documents-projects">
+<rect x="1170" y="260" width="690" height="352" rx="18" class="card"/>
+<rect x="1170" y="260" width="690" height="82" rx="18" fill="#1d4ed8"/>
+<path d="M 1170 322 H 1860 V 342 H 1170 Z" fill="#1d4ed8"/>
+<text x="1198" y="294" class="schema" text-anchor="start">documents</text>
+<text x="1198" y="326" class="table-title" text-anchor="start">projects</text>
+<rect x="1194" y="351" width="82" height="28" rx="8" class="tag pk"/>
+<text x="1235" y="371" class="tag-text" text-anchor="middle">PK</text>
+<text x="1292" y="376" class="col-name" text-anchor="start">id</text>
+<text x="1832" y="376" class="col-type" text-anchor="end">bigserial</text>
+<rect x="1184" y="389" width="662" height="38" rx="8" class="row-alt"/>
+<rect x="1194" y="393" width="82" height="28" rx="8" class="tag ext"/>
+<text x="1235" y="413" class="tag-text" text-anchor="middle">UQ</text>
+<text x="1292" y="418" class="col-name" text-anchor="start">name</text>
+<text x="1832" y="418" class="col-type" text-anchor="end">text</text>
+<text x="1212" y="460" class="col-name" text-anchor="start">description</text>
+<text x="1832" y="460" class="col-type" text-anchor="end">text</text>
+<rect x="1184" y="473" width="662" height="38" rx="8" class="row-alt"/>
+<text x="1212" y="502" class="col-name" text-anchor="start">state</text>
+<text x="1832" y="502" class="col-type" text-anchor="end">text</text>
+<text x="1212" y="544" class="col-name" text-anchor="start">created_at</text>
+<text x="1832" y="544" class="col-type" text-anchor="end">timestamptz</text>
+<rect x="1184" y="557" width="662" height="38" rx="8" class="row-alt"/>
+<text x="1212" y="586" class="col-name" text-anchor="start">updated_at</text>
+<text x="1832" y="586" class="col-type" text-anchor="end">timestamptz</text>
+</g>
+<g class="table" id="documents-project_index_configs">
+<rect x="130" y="535" width="820" height="562" rx="18" class="card"/>
+<rect x="130" y="535" width="820" height="82" rx="18" fill="#2563eb"/>
+<path d="M 130 597 H 950 V 617 H 130 Z" fill="#2563eb"/>
+<text x="158" y="569" class="schema" text-anchor="start">documents</text>
+<text x="158" y="601" class="table-title" text-anchor="start">project_index_configs</text>
+<rect x="154" y="626" width="82" height="28" rx="8" class="tag pk"/>
+<text x="195" y="646" class="tag-text" text-anchor="middle">PK</text>
+<text x="252" y="651" class="col-name" text-anchor="start">id</text>
+<text x="922" y="651" class="col-type" text-anchor="end">bigserial</text>
+<rect x="144" y="664" width="792" height="38" rx="8" class="row-alt"/>
+<rect x="154" y="668" width="82" height="28" rx="8" class="tag fk"/>
+<text x="195" y="688" class="tag-text" text-anchor="middle">FK</text>
+<text x="252" y="693" class="col-name" text-anchor="start">project_id</text>
+<text x="922" y="693" class="col-type" text-anchor="end">bigint</text>
+<rect x="154" y="710" width="82" height="28" rx="8" class="tag ext"/>
+<text x="195" y="730" class="tag-text" text-anchor="middle">UQ</text>
+<text x="252" y="735" class="col-name" text-anchor="start">version</text>
+<text x="922" y="735" class="col-type" text-anchor="end">integer</text>
+<rect x="144" y="748" width="792" height="38" rx="8" class="row-alt"/>
+<text x="172" y="777" class="col-name" text-anchor="start">is_active</text>
+<text x="922" y="777" class="col-type" text-anchor="end">boolean</text>
+<text x="172" y="819" class="col-name" text-anchor="start">embedding_model_name</text>
+<text x="922" y="819" class="col-type" text-anchor="end">text</text>
+<rect x="144" y="832" width="792" height="38" rx="8" class="row-alt"/>
+<text x="172" y="861" class="col-name" text-anchor="start">embedding_dimension</text>
+<text x="922" y="861" class="col-type" text-anchor="end">integer</text>
+<text x="172" y="903" class="col-name" text-anchor="start">parser_settings</text>
+<text x="922" y="903" class="col-type" text-anchor="end">group</text>
+<rect x="144" y="916" width="792" height="38" rx="8" class="row-alt"/>
+<text x="172" y="945" class="col-name" text-anchor="start">chunking_settings</text>
+<text x="922" y="945" class="col-type" text-anchor="end">group</text>
+<text x="172" y="987" class="col-name" text-anchor="start">rag_retrieval_settings</text>
+<text x="922" y="987" class="col-type" text-anchor="end">group</text>
+<rect x="144" y="1000" width="792" height="38" rx="8" class="row-alt"/>
+<text x="172" y="1029" class="col-name" text-anchor="start">contradiction_settings</text>
+<text x="922" y="1029" class="col-type" text-anchor="end">group</text>
+<text x="172" y="1071" class="col-name" text-anchor="start">created_at / activated_at</text>
+<text x="922" y="1071" class="col-type" text-anchor="end">time</text>
+</g>
+<g class="table" id="documents-documents">
+<rect x="1120" y="625" width="760" height="604" rx="18" class="card"/>
+<rect x="1120" y="625" width="760" height="82" rx="18" fill="#0f766e"/>
+<path d="M 1120 687 H 1880 V 707 H 1120 Z" fill="#0f766e"/>
+<text x="1148" y="659" class="schema" text-anchor="start">documents</text>
+<text x="1148" y="691" class="table-title" text-anchor="start">documents</text>
+<rect x="1144" y="716" width="82" height="28" rx="8" class="tag pk"/>
+<text x="1185" y="736" class="tag-text" text-anchor="middle">PK</text>
+<text x="1242" y="741" class="col-name" text-anchor="start">id</text>
+<text x="1852" y="741" class="col-type" text-anchor="end">bigserial</text>
+<rect x="1134" y="754" width="732" height="38" rx="8" class="row-alt"/>
+<rect x="1144" y="758" width="82" height="28" rx="8" class="tag fk"/>
+<text x="1185" y="778" class="tag-text" text-anchor="middle">FK</text>
+<text x="1242" y="783" class="col-name" text-anchor="start">project_id</text>
+<text x="1852" y="783" class="col-type" text-anchor="end">bigint</text>
+<text x="1162" y="825" class="col-name" text-anchor="start">name</text>
+<text x="1852" y="825" class="col-type" text-anchor="end">text</text>
+<rect x="1134" y="838" width="732" height="38" rx="8" class="row-alt"/>
+<rect x="1144" y="842" width="82" height="28" rx="8" class="tag ext"/>
+<text x="1185" y="862" class="tag-text" text-anchor="middle">EXT</text>
+<text x="1242" y="867" class="col-name" text-anchor="start">storage_key</text>
+<text x="1852" y="867" class="col-type" text-anchor="end">text</text>
+<text x="1162" y="909" class="col-name" text-anchor="start">size_bytes</text>
+<text x="1852" y="909" class="col-type" text-anchor="end">bigint</text>
+<rect x="1134" y="922" width="732" height="38" rx="8" class="row-alt"/>
+<text x="1162" y="951" class="col-name" text-anchor="start">mime_type</text>
+<text x="1852" y="951" class="col-type" text-anchor="end">text</text>
+<text x="1162" y="993" class="col-name" text-anchor="start">sha256</text>
+<text x="1852" y="993" class="col-type" text-anchor="end">text</text>
+<rect x="1134" y="1006" width="732" height="38" rx="8" class="row-alt"/>
+<text x="1162" y="1035" class="col-name" text-anchor="start">status</text>
+<text x="1852" y="1035" class="col-type" text-anchor="end">text</text>
+<rect x="1144" y="1052" width="82" height="28" rx="8" class="tag fk"/>
+<text x="1185" y="1072" class="tag-text" text-anchor="middle">FK</text>
+<text x="1242" y="1077" class="col-name" text-anchor="start">indexed_config_id</text>
+<text x="1852" y="1077" class="col-type" text-anchor="end">bigint</text>
+<rect x="1134" y="1090" width="732" height="38" rx="8" class="row-alt"/>
+<text x="1162" y="1119" class="col-name" text-anchor="start">summary</text>
+<text x="1852" y="1119" class="col-type" text-anchor="end">text</text>
+<text x="1162" y="1161" class="col-name" text-anchor="start">failure_reason</text>
+<text x="1852" y="1161" class="col-type" text-anchor="end">text</text>
+<rect x="1134" y="1174" width="732" height="38" rx="8" class="row-alt"/>
+<text x="1162" y="1203" class="col-name" text-anchor="start">created_at / updated_at</text>
+<text x="1852" y="1203" class="col-type" text-anchor="end">time</text>
+</g>
+<g class="table" id="documents-chunks">
+<rect x="1120" y="1295" width="760" height="562" rx="18" class="card"/>
+<rect x="1120" y="1295" width="760" height="82" rx="18" fill="#0891b2"/>
+<path d="M 1120 1357 H 1880 V 1377 H 1120 Z" fill="#0891b2"/>
+<text x="1148" y="1329" class="schema" text-anchor="start">documents</text>
+<text x="1148" y="1361" class="table-title" text-anchor="start">chunks</text>
+<rect x="1144" y="1386" width="82" height="28" rx="8" class="tag pk"/>
+<text x="1185" y="1406" class="tag-text" text-anchor="middle">PK</text>
+<text x="1242" y="1411" class="col-name" text-anchor="start">id</text>
+<text x="1852" y="1411" class="col-type" text-anchor="end">bigserial</text>
+<rect x="1134" y="1424" width="732" height="38" rx="8" class="row-alt"/>
+<rect x="1144" y="1428" width="82" height="28" rx="8" class="tag fk"/>
+<text x="1185" y="1448" class="tag-text" text-anchor="middle">FK</text>
+<text x="1242" y="1453" class="col-name" text-anchor="start">document_id</text>
+<text x="1852" y="1453" class="col-type" text-anchor="end">bigint</text>
+<rect x="1144" y="1470" width="82" height="28" rx="8" class="tag fk"/>
+<text x="1185" y="1490" class="tag-text" text-anchor="middle">FK</text>
+<text x="1242" y="1495" class="col-name" text-anchor="start">project_id</text>
+<text x="1852" y="1495" class="col-type" text-anchor="end">bigint</text>
+<rect x="1134" y="1508" width="732" height="38" rx="8" class="row-alt"/>
+<rect x="1144" y="1512" width="82" height="28" rx="8" class="tag fk"/>
+<text x="1185" y="1532" class="tag-text" text-anchor="middle">FK</text>
+<text x="1242" y="1537" class="col-name" text-anchor="start">index_config_id</text>
+<text x="1852" y="1537" class="col-type" text-anchor="end">bigint</text>
+<rect x="1144" y="1554" width="82" height="28" rx="8" class="tag ext"/>
+<text x="1185" y="1574" class="tag-text" text-anchor="middle">EXT</text>
+<text x="1242" y="1579" class="col-name" text-anchor="start">qdrant_point_id</text>
+<text x="1852" y="1579" class="col-type" text-anchor="end">uuid</text>
+<rect x="1134" y="1592" width="732" height="38" rx="8" class="row-alt"/>
+<rect x="1144" y="1596" width="82" height="28" rx="8" class="tag ext"/>
+<text x="1185" y="1616" class="tag-text" text-anchor="middle">UQ</text>
+<text x="1242" y="1621" class="col-name" text-anchor="start">chunk_order</text>
+<text x="1852" y="1621" class="col-type" text-anchor="end">integer</text>
+<text x="1162" y="1663" class="col-name" text-anchor="start">text</text>
+<text x="1852" y="1663" class="col-type" text-anchor="end">text</text>
+<rect x="1134" y="1676" width="732" height="38" rx="8" class="row-alt"/>
+<text x="1162" y="1705" class="col-name" text-anchor="start">char_start</text>
+<text x="1852" y="1705" class="col-type" text-anchor="end">integer</text>
+<text x="1162" y="1747" class="col-name" text-anchor="start">char_end</text>
+<text x="1852" y="1747" class="col-type" text-anchor="end">integer</text>
+<rect x="1134" y="1760" width="732" height="38" rx="8" class="row-alt"/>
+<text x="1162" y="1789" class="col-name" text-anchor="start">token_count / page_number</text>
+<text x="1852" y="1789" class="col-type" text-anchor="end">integer</text>
+<text x="1162" y="1831" class="col-name" text-anchor="start">created_at</text>
+<text x="1852" y="1831" class="col-type" text-anchor="end">timestamptz</text>
+</g>
+<g class="table" id="documents-document_processing_jobs">
+<rect x="130" y="1625" width="820" height="562" rx="18" class="card"/>
+<rect x="130" y="1625" width="820" height="82" rx="18" fill="#7c3aed"/>
+<path d="M 130 1687 H 950 V 1707 H 130 Z" fill="#7c3aed"/>
+<text x="158" y="1659" class="schema" text-anchor="start">documents</text>
+<text x="158" y="1691" class="table-title" text-anchor="start">document_processing_jobs</text>
+<rect x="154" y="1716" width="82" height="28" rx="8" class="tag pk"/>
+<text x="195" y="1736" class="tag-text" text-anchor="middle">PK</text>
+<text x="252" y="1741" class="col-name" text-anchor="start">id</text>
+<text x="922" y="1741" class="col-type" text-anchor="end">bigserial</text>
+<rect x="144" y="1754" width="792" height="38" rx="8" class="row-alt"/>
+<rect x="154" y="1758" width="82" height="28" rx="8" class="tag fk"/>
+<text x="195" y="1778" class="tag-text" text-anchor="middle">FK</text>
+<text x="252" y="1783" class="col-name" text-anchor="start">project_id</text>
+<text x="922" y="1783" class="col-type" text-anchor="end">bigint</text>
+<rect x="154" y="1800" width="82" height="28" rx="8" class="tag fk"/>
+<text x="195" y="1820" class="tag-text" text-anchor="middle">FK</text>
+<text x="252" y="1825" class="col-name" text-anchor="start">document_id</text>
+<text x="922" y="1825" class="col-type" text-anchor="end">bigint</text>
+<rect x="144" y="1838" width="792" height="38" rx="8" class="row-alt"/>
+<text x="172" y="1867" class="col-name" text-anchor="start">kind</text>
+<text x="922" y="1867" class="col-type" text-anchor="end">text</text>
+<text x="172" y="1909" class="col-name" text-anchor="start">status</text>
+<text x="922" y="1909" class="col-type" text-anchor="end">text</text>
+<rect x="144" y="1922" width="792" height="38" rx="8" class="row-alt"/>
+<rect x="154" y="1926" width="82" height="28" rx="8" class="tag fk"/>
+<text x="195" y="1946" class="tag-text" text-anchor="middle">FK</text>
+<text x="252" y="1951" class="col-name" text-anchor="start">target_index_config_id</text>
+<text x="922" y="1951" class="col-type" text-anchor="end">bigint</text>
+<text x="172" y="1993" class="col-name" text-anchor="start">attempt_count</text>
+<text x="922" y="1993" class="col-type" text-anchor="end">integer</text>
+<rect x="144" y="2006" width="792" height="38" rx="8" class="row-alt"/>
+<text x="172" y="2035" class="col-name" text-anchor="start">last_error</text>
+<text x="922" y="2035" class="col-type" text-anchor="end">text</text>
+<text x="172" y="2077" class="col-name" text-anchor="start">claimed_by / claimed_at</text>
+<text x="922" y="2077" class="col-type" text-anchor="end">claim</text>
+<rect x="144" y="2090" width="792" height="38" rx="8" class="row-alt"/>
+<text x="172" y="2119" class="col-name" text-anchor="start">created_at / updated_at</text>
+<text x="922" y="2119" class="col-type" text-anchor="end">time</text>
+<text x="172" y="2161" class="col-name" text-anchor="start">completed_at</text>
+<text x="922" y="2161" class="col-type" text-anchor="end">timestamptz</text>
+</g>
+<g class="table" id="documents-document_history">
+<rect x="2090" y="1510" width="660" height="310" rx="18" class="card"/>
+<rect x="2090" y="1510" width="660" height="82" rx="18" fill="#ea580c"/>
+<path d="M 2090 1572 H 2750 V 1592 H 2090 Z" fill="#ea580c"/>
+<text x="2118" y="1544" class="schema" text-anchor="start">documents</text>
+<text x="2118" y="1576" class="table-title" text-anchor="start">document_history</text>
+<rect x="2114" y="1601" width="82" height="28" rx="8" class="tag pk"/>
+<text x="2155" y="1621" class="tag-text" text-anchor="middle">PK</text>
+<text x="2212" y="1626" class="col-name" text-anchor="start">id</text>
+<text x="2722" y="1626" class="col-type" text-anchor="end">bigserial</text>
+<rect x="2104" y="1639" width="632" height="38" rx="8" class="row-alt"/>
+<rect x="2114" y="1643" width="82" height="28" rx="8" class="tag fk"/>
+<text x="2155" y="1663" class="tag-text" text-anchor="middle">FK</text>
+<text x="2212" y="1668" class="col-name" text-anchor="start">document_id</text>
+<text x="2722" y="1668" class="col-type" text-anchor="end">bigint</text>
+<text x="2132" y="1710" class="col-name" text-anchor="start">operation</text>
+<text x="2722" y="1710" class="col-type" text-anchor="end">text</text>
+<rect x="2104" y="1723" width="632" height="38" rx="8" class="row-alt"/>
+<text x="2132" y="1752" class="col-name" text-anchor="start">details</text>
+<text x="2722" y="1752" class="col-type" text-anchor="end">json</text>
+<text x="2132" y="1794" class="col-name" text-anchor="start">created_at</text>
+<text x="2722" y="1794" class="col-type" text-anchor="end">timestamptz</text>
+</g>
+<g class="table" id="analysis-analysis_jobs">
+<rect x="2225" y="560" width="760" height="562" rx="18" class="card"/>
+<rect x="2225" y="560" width="760" height="82" rx="18" fill="#16a34a"/>
+<path d="M 2225 622 H 2985 V 642 H 2225 Z" fill="#16a34a"/>
+<text x="2253" y="594" class="schema" text-anchor="start">analysis</text>
+<text x="2253" y="626" class="table-title" text-anchor="start">analysis_jobs</text>
+<rect x="2249" y="651" width="82" height="28" rx="8" class="tag pk"/>
+<text x="2290" y="671" class="tag-text" text-anchor="middle">PK</text>
+<text x="2347" y="676" class="col-name" text-anchor="start">id</text>
+<text x="2957" y="676" class="col-type" text-anchor="end">bigserial</text>
+<rect x="2239" y="689" width="732" height="38" rx="8" class="row-alt"/>
+<rect x="2249" y="693" width="82" height="28" rx="8" class="tag fk"/>
+<text x="2290" y="713" class="tag-text" text-anchor="middle">FK</text>
+<text x="2347" y="718" class="col-name" text-anchor="start">project_id</text>
+<text x="2957" y="718" class="col-type" text-anchor="end">bigint</text>
+<rect x="2249" y="735" width="82" height="28" rx="8" class="tag fk"/>
+<text x="2290" y="755" class="tag-text" text-anchor="middle">FK</text>
+<text x="2347" y="760" class="col-name" text-anchor="start">base_document_id</text>
+<text x="2957" y="760" class="col-type" text-anchor="end">bigint</text>
+<rect x="2239" y="773" width="732" height="38" rx="8" class="row-alt"/>
+<text x="2267" y="802" class="col-name" text-anchor="start">status</text>
+<text x="2957" y="802" class="col-type" text-anchor="end">text</text>
+<text x="2267" y="844" class="col-name" text-anchor="start">warning_message</text>
+<text x="2957" y="844" class="col-type" text-anchor="end">text</text>
+<rect x="2239" y="857" width="732" height="38" rx="8" class="row-alt"/>
+<text x="2267" y="886" class="col-name" text-anchor="start">error_message</text>
+<text x="2957" y="886" class="col-type" text-anchor="end">text</text>
+<text x="2267" y="928" class="col-name" text-anchor="start">results</text>
+<text x="2957" y="928" class="col-type" text-anchor="end">json</text>
+<rect x="2239" y="941" width="732" height="38" rx="8" class="row-alt"/>
+<text x="2267" y="970" class="col-name" text-anchor="start">attempt_count</text>
+<text x="2957" y="970" class="col-type" text-anchor="end">integer</text>
+<text x="2267" y="1012" class="col-name" text-anchor="start">claimed_by / claimed_at</text>
+<text x="2957" y="1012" class="col-type" text-anchor="end">claim</text>
+<rect x="2239" y="1025" width="732" height="38" rx="8" class="row-alt"/>
+<text x="2267" y="1054" class="col-name" text-anchor="start">created_at / updated_at</text>
+<text x="2957" y="1054" class="col-type" text-anchor="end">time</text>
+<text x="2267" y="1096" class="col-name" text-anchor="start">completed_at</text>
+<text x="2957" y="1096" class="col-type" text-anchor="end">timestamptz</text>
+</g>
+<g class="table" id="analysis-analysis_job_targets">
+<rect x="2830" y="1360" width="520" height="184" rx="18" class="card"/>
+<rect x="2830" y="1360" width="520" height="82" rx="18" fill="#15803d"/>
+<path d="M 2830 1422 H 3350 V 1442 H 2830 Z" fill="#15803d"/>
+<text x="2858" y="1394" class="schema" text-anchor="start">analysis</text>
+<text x="2858" y="1426" class="table-title" text-anchor="start">analysis_job_targets</text>
+<rect x="2854" y="1451" width="82" height="28" rx="8" class="tag pk"/>
+<text x="2895" y="1471" class="tag-text" text-anchor="middle">PK/FK</text>
+<text x="2952" y="1476" class="col-name" text-anchor="start">job_id</text>
+<text x="3322" y="1476" class="col-type" text-anchor="end">bigint</text>
+<rect x="2844" y="1489" width="492" height="38" rx="8" class="row-alt"/>
+<rect x="2854" y="1493" width="82" height="28" rx="8" class="tag pk"/>
+<text x="2895" y="1513" class="tag-text" text-anchor="middle">PK/FK</text>
+<text x="2952" y="1518" class="col-name" text-anchor="start">document_id</text>
+<text x="3322" y="1518" class="col-type" text-anchor="end">bigint</text>
+</g>
+<g class="table" id="public-alembic_version">
+<rect x="2775" y="2015" width="540" height="142" rx="18" class="card"/>
+<rect x="2775" y="2015" width="540" height="82" rx="18" fill="#64748b"/>
+<path d="M 2775 2077 H 3315 V 2097 H 2775 Z" fill="#64748b"/>
+<text x="2803" y="2049" class="schema" text-anchor="start">public</text>
+<text x="2803" y="2081" class="table-title" text-anchor="start">alembic_version</text>
+<rect x="2799" y="2106" width="82" height="28" rx="8" class="tag pk"/>
+<text x="2840" y="2126" class="tag-text" text-anchor="middle">PK</text>
+<text x="2897" y="2131" class="col-name" text-anchor="start">version_num</text>
+<text x="3287" y="2131" class="col-type" text-anchor="end">varchar(32)</text>
+</g>
+<g>
+<rect x="120" y="2244" width="1110" height="92" rx="18" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+<text x="148" y="2298" class="legend-title" text-anchor="start">Legend</text>
+<rect x="270" y="2270" width="74" height="30" rx="8" class="tag pk"/>
+<text x="307" y="2291" class="tag-text" text-anchor="middle">PK</text>
+<text x="358" y="2292" class="legend" text-anchor="start">Primary key</text>
+<rect x="505" y="2270" width="74" height="30" rx="8" class="tag fk"/>
+<text x="542" y="2291" class="tag-text" text-anchor="middle">FK</text>
+<text x="593" y="2292" class="legend" text-anchor="start">Foreign key</text>
+<rect x="740" y="2270" width="74" height="30" rx="8" class="tag pk"/>
+<text x="777" y="2291" class="tag-text" text-anchor="middle">UQ</text>
+<text x="828" y="2292" class="legend" text-anchor="start">Unique</text>
+<rect x="975" y="2270" width="74" height="30" rx="8" class="tag ext"/>
+<text x="1012" y="2291" class="tag-text" text-anchor="middle">EXT</text>
+<text x="1063" y="2292" class="legend" text-anchor="start">External store reference</text>
+</g>
+</svg>

@@ -1,0 +1,209 @@
+name: diploma_kubsu
+services:
+  api:
+    build:
+      context: /Users/damir/Documents/Diploma_Kubsu/api
+      dockerfile: Dockerfile
+    container_name: rag-system-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+      qdrant:
+        condition: service_healthy
+        required: false
+    environment:
+      APP_ENV: development
+      CONTRADICTION_DENSE_WEIGHT: "0.3"
+      CONTRADICTION_MAX_CANDIDATES_PER_TARGET: "40"
+      CONTRADICTION_MAX_DISTANCE: "0.8"
+      CONTRADICTION_MAX_PAIRS_PER_JOB: "100"
+      CONTRADICTION_SPARSE_WEIGHT: "0.7"
+      CONTRADICTION_TOP_K: "20"
+      CORS_ALLOW_ORIGINS: '*'
+      DOCLING_BASE_URL: http://docling:5001
+      DOCLING_TIMEOUT_SECONDS: "300"
+      EMBEDDING_API_KEY: sk-34YoHEAH8PNjedgw6v3-sTn5FNwh5Sxt
+      EMBEDDING_API_TYPE: openai_compatible
+      EMBEDDING_BASE_URL: https://routerai.ru/api/v1
+      EMBEDDING_BATCH_SIZE: "16"
+      EMBEDDING_MAX_RETRIES: "3"
+      EMBEDDING_RETRY_DELAY: "5"
+      EMBEDDING_TIMEOUT_SECONDS: "180"
+      FASTEMBED_CACHE_PATH: /root/.cache/huggingface
+      FILES_ROOT_DIR: /app/storage
+      GENERATE_SUMMARY: "true"
+      GRAYLOG_ENABLED: "true"
+      GRAYLOG_HOST: graylog
+      GRAYLOG_PORT: "12201"
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: "8080"
+      LLM_API_KEY: sk-34YoHEAH8PNjedgw6v3-sTn5FNwh5Sxt
+      LLM_BASE_URL: https://routerai.ru/api/v1
+      LLM_HTTP_TIMEOUT: "180"
+      LLM_MAX_RETRIES: "3"
+      LLM_MODEL: deepseek/deepseek-v4-pro
+      LLM_RETRY_DELAY: "5"
+      LOG_LEVEL: INFO
+      MAX_CONTRADICTION_LLM_CONCURRENT_REQUESTS: "9"
+      MAX_CONTRADICTION_RETRIEVAL_CONCURRENT_TARGETS: "10"
+      MAX_EMBEDDING_CONCURRENT_REQUESTS: "2"
+      MAX_SUMMARY_LLM_CONCURRENT_REQUESTS: "9"
+      MINIO_ENDPOINT: http://minio:9000
+      OBJECT_STORAGE_PROVIDER: local
+      POSTGRES_DSN: postgres://rag_system:rag_system@postgres:5432/rag_system_db
+      POSTGRES_MAX_CONNS: "10"
+      POSTGRES_MIN_CONNS: "2"
+      PROJECT_INDEX_DEFAULTS_CHUNK_OVERLAP: "64"
+      PROJECT_INDEX_DEFAULTS_CHUNK_SIZE: "512"
+      PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION: "4096"
+      PROJECT_INDEX_DEFAULTS_EMBEDDING_MODEL_NAME: qwen/qwen3-embedding-8b
+      PROMPTS_DIR: /app/prompts
+      QDRANT_API_KEY: ""
+      QDRANT_COLLECTION_NAME: rag-system-project
+      QDRANT_ON_DISK_PAYLOAD: "true"
+      QDRANT_URL: http://qdrant:6333
+      RAG_DENSE_WEIGHT: "0.7"
+      RAG_RETRIEVAL_TOP_K: "5"
+      RAG_SPARSE_WEIGHT: "0.3"
+      SPARSE_MODEL: Qdrant/bm25
+      SPARSE_VECTOR_ENABLED: "true"
+      SUMMARY_SEGMENT_SIZE: "30000"
+      TEI_BASE_URL: https://routerai.ru/api/v1
+      TEI_EMBED_BATCH_SIZE: "16"
+      TEI_HTTP_TIMEOUT: "180"
+      UPLOAD_MAX_SIZE_MB: "25"
+      USE_DOCLING: "false"
+      WORKER_BATCH_SIZE: "10"
+      WORKER_POLL_INTERVAL: "3"
+    image: rag-system-api:local
+    networks:
+      rag-system: null
+    ports:
+      - mode: ingress
+        target: 8080
+        published: "8080"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /Users/damir/Documents/Diploma_Kubsu/api/app
+        target: /app/app
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /Users/damir/Documents/Diploma_Kubsu/api/prompts
+        target: /app/prompts
+        bind:
+          create_host_path: true
+      - type: volume
+        source: rag-system-files
+        target: /app/storage
+        volume: {}
+      - type: volume
+        source: hf_cache
+        target: /root/.cache/huggingface
+        volume: {}
+  worker:
+    command:
+      - python
+      - -m
+      - app.worker.worker
+    container_name: rag-system-worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+      qdrant:
+        condition: service_healthy
+        required: false
+    environment:
+      APP_ENV: development
+      CONTRADICTION_DENSE_WEIGHT: "0.3"
+      CONTRADICTION_MAX_CANDIDATES_PER_TARGET: "40"
+      CONTRADICTION_MAX_DISTANCE: "0.8"
+      CONTRADICTION_MAX_PAIRS_PER_JOB: "100"
+      CONTRADICTION_SPARSE_WEIGHT: "0.7"
+      CONTRADICTION_TOP_K: "20"
+      DOCLING_BASE_URL: http://docling:5001
+      DOCLING_TIMEOUT_SECONDS: "300"
+      EMBEDDING_API_KEY: sk-34YoHEAH8PNjedgw6v3-sTn5FNwh5Sxt
+      EMBEDDING_API_TYPE: openai_compatible
+      EMBEDDING_BASE_URL: https://routerai.ru/api/v1
+      EMBEDDING_BATCH_SIZE: "16"
+      EMBEDDING_MAX_RETRIES: "3"
+      EMBEDDING_MODEL: minishlab/potion-base-32M
+      EMBEDDING_RETRY_DELAY: "5"
+      EMBEDDING_TIMEOUT_SECONDS: "180"
+      EMBEDDING_VECTOR_SIZE: "256"
+      FASTEMBED_CACHE_PATH: /root/.cache/huggingface
+      FILES_ROOT_DIR: /app/storage
+      GENERATE_SUMMARY: "true"
+      GRAYLOG_ENABLED: "true"
+      GRAYLOG_HOST: graylog
+      GRAYLOG_PORT: "12201"
+      LLM_API_KEY: sk-34YoHEAH8PNjedgw6v3-sTn5FNwh5Sxt
+      LLM_BASE_URL: https://routerai.ru/api/v1
+      LLM_HTTP_TIMEOUT: "180"
+      LLM_MAX_RETRIES: "3"
+      LLM_MODEL: deepseek/deepseek-v4-pro
+      LLM_RETRY_DELAY: "5"
+      LOG_LEVEL: INFO
+      MAX_CONTRADICTION_LLM_CONCURRENT_REQUESTS: "9"
+      MAX_CONTRADICTION_RETRIEVAL_CONCURRENT_TARGETS: "10"
+      MAX_EMBEDDING_CONCURRENT_REQUESTS: "2"
+      MAX_SUMMARY_LLM_CONCURRENT_REQUESTS: "9"
+      OBJECT_STORAGE_PROVIDER: local
+      POSTGRES_DSN: postgres://rag_system:rag_system@postgres:5432/rag_system_db
+      POSTGRES_MAX_CONNS: "10"
+      POSTGRES_MIN_CONNS: "2"
+      PROJECT_INDEX_DEFAULTS_CHUNK_OVERLAP: "64"
+      PROJECT_INDEX_DEFAULTS_CHUNK_SIZE: "512"
+      PROJECT_INDEX_DEFAULTS_EMBEDDING_DIMENSION: "4096"
+      PROJECT_INDEX_DEFAULTS_EMBEDDING_MODEL_NAME: qwen/qwen3-embedding-8b
+      PROMPTS_DIR: /app/prompts
+      QDRANT_API_KEY: ""
+      QDRANT_COLLECTION_NAME: rag-system-project
+      QDRANT_ON_DISK_PAYLOAD: "true"
+      QDRANT_URL: http://qdrant:6333
+      SPARSE_MODEL: Qdrant/bm25
+      SPARSE_VECTOR_ENABLED: "true"
+      SUMMARY_SEGMENT_SIZE: "30000"
+      TEI_BASE_URL: https://routerai.ru/api/v1
+      TEI_EMBED_BATCH_SIZE: "16"
+      TEI_HTTP_TIMEOUT: "180"
+      UPLOAD_MAX_SIZE_MB: "25"
+      USE_DOCLING: "false"
+      WORKER_POLL_INTERVAL: "3"
+    image: rag-system-api:local
+    networks:
+      rag-system: null
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /Users/damir/Documents/Diploma_Kubsu/api/app
+        target: /app/app
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /Users/damir/Documents/Diploma_Kubsu/api/prompts
+        target: /app/prompts
+        bind:
+          create_host_path: true
+      - type: volume
+        source: rag-system-files
+        target: /app/storage
+        volume: {}
+      - type: volume
+        source: hf_cache
+        target: /root/.cache/huggingface
+        volume: {}
+networks:
+  rag-system:
+    name: rag-system
+    driver: bridge
+volumes:
+  hf_cache:
+    name: diploma_kubsu_hf_cache
+  rag-system-files:
+    name: diploma_kubsu_rag-system-files

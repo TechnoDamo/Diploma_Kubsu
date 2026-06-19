@@ -11,7 +11,7 @@ class GELFLogHandler(logging.Handler):
     """Sends GELF-formatted logs to Graylog via UDP."""
 
     def __init__(self, host: str, port: int = 12201,
-                 facility: str = "mimir", level: int = logging.NOTSET):
+                 facility: str = "rag_system", level: int = logging.NOTSET):
         super().__init__(level)
         self._host = host
         self._port = port
@@ -77,7 +77,7 @@ def setup_logging(
         graylog_handler = GELFLogHandler(
             host=graylog_host,
             port=graylog_port,
-            facility="mimir",
+            facility="rag_system",
             level=level,
         )
         root_logger.addHandler(graylog_handler)

@@ -1,4 +1,4 @@
-Project mimir {
+Project rag_system {
   database_type: 'PostgreSQL'
   Note: '''
   PostgreSQL хранит состояние системы: проекты, документы, чанки, очередь фоновых задач
@@ -11,7 +11,6 @@ Table documents.projects {
   id bigserial [pk]
   name text [unique, not null]
   description text [not null, default: ""]
-  general_context text [not null, default: "", note: "Контекст проекта для будущей настройки RAG и промптов анализа."]
   state text [not null, default: "active", note: "active | reindexing | deleting"]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
@@ -148,4 +147,8 @@ Table analysis.analysis_job_targets {
   Indexes {
     (job_id, document_id) [pk]
   }
+}
+
+Table public.alembic_version {
+  version_num varchar(32) [pk, not null, note: "Alembic migration version marker."]
 }

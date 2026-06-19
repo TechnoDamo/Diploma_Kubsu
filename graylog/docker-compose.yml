@@ -6,7 +6,7 @@ services:
     volumes:
       - graylog_mongodb_data:/data/db
     networks:
-      - mimir
+      - rag-system
 
   elasticsearch:
     profiles: ["local-graylog"]
@@ -19,7 +19,7 @@ services:
     volumes:
       - graylog_es_data:/usr/share/elasticsearch/data
     networks:
-      - mimir
+      - rag-system
 
   graylog:
     profiles: ["local-graylog"]
@@ -40,12 +40,12 @@ services:
       - mongodb
       - elasticsearch
     networks:
-      - mimir
+      - rag-system
 
   graylog-init:
     profiles: ["local-graylog"]
     image: curlimages/curl:8.8.0
-    container_name: mimir-graylog-init
+    container_name: rag-system-graylog-init
     entrypoint:
       - /bin/sh
       - -c
@@ -69,13 +69,13 @@ services:
       - graylog
     restart: "no"
     networks:
-      - mimir
+      - rag-system
 
 volumes:
   graylog_mongodb_data:
   graylog_es_data:
 
 networks:
-  mimir:
-    name: mimir
+  rag-system:
+    name: rag-system
     driver: bridge

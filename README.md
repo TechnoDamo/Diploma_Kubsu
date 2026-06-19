@@ -1,6 +1,6 @@
-# Mimir — RAG-система для анализа документов
+# RAG System — RAG-система для анализа документов
 
-Mimir — дипломный проект: система для загрузки документов, семантического поиска по ним,
+RAG System — дипломный проект: система для загрузки документов, семантического поиска по ним,
 ответов на вопросы с цитатами и поиска противоречий между документами. Проект ориентирован
 на локальный запуск через Docker Compose, но LLM и сервис эмбеддингов можно заменить
 облачными OpenAI-compatible API.
@@ -58,7 +58,7 @@ make fast-up
 
 | Команда | Что делает | Когда использовать | Ориентир по времени |
 |---------|------------|--------------------|---------------------|
-| `make up` | Запускает backend-стек. Если образ `mimir-api:local` отсутствует, сначала собирает его. | Обычный запуск. | Первый запуск: минуты; повторно: 5-30 секунд. |
+| `make up` | Запускает backend-стек. Если образ `rag-system-api:local` отсутствует, сначала собирает его. | Обычный запуск. | Первый запуск: минуты; повторно: 5-30 секунд. |
 | `make fast-up` | Запускает backend-стек без Graylog. | Локальная разработка и демонстрация без лог-агрегатора. | Обычно быстрее `make up`. |
 | `make up-build` | Запускает стек с `docker compose up --build`. | После изменения `api/Dockerfile`, `api/pyproject.toml`, `api/uv.lock` или compose-настроек. | 20-90 секунд с тёплым кешем, дольше при скачивании зависимостей. |
 | `make build` | Собирает только API-образ, контейнеры не запускает. | Проверить сборку отдельно от запуска. | Как `up-build`, но без старта сервисов. |
@@ -237,7 +237,7 @@ RAG-запрос работает синхронно:
 | `GET` | `/projects/{project_id}/analysis/contradictions` | Список задач анализа. |
 | `GET` | `/projects/{project_id}/analysis/contradictions/{job_id}` | Статус и результат задачи. |
 
-OpenAPI-спецификация лежит в [api-docs-swagger/specs/mimir-rag-api.yaml](/Users/damir/Documents/Diploma_Kubsu/api-docs-swagger/specs/mimir-rag-api.yaml).
+OpenAPI-спецификация лежит в [api-docs-swagger/specs/rag-system-api.yaml](/Users/damir/Documents/Diploma_Kubsu/api-docs-swagger/specs/rag-system-api.yaml).
 
 ## Структура репозитория
 
@@ -312,8 +312,8 @@ curl -s http://localhost:8080/api/v1/projects/1/documents/1
 
 | Симптом | Что проверить |
 |---------|---------------|
-| Документ долго остаётся `uploaded` | Работает ли контейнер `mimir-worker`; нет ли старых задач перед ним в очереди. |
-| Документ стал `failed` | `docker logs mimir-worker`, настройки Docling, лимит размера файла, доступность embedding API. |
+| Документ долго остаётся `uploaded` | Работает ли контейнер `rag-system-worker`; нет ли старых задач перед ним в очереди. |
+| Документ стал `failed` | `docker logs rag-system-worker`, настройки Docling, лимит размера файла, доступность embedding API. |
 | RAG отвечает без источников | Есть ли в проекте документы со статусом `indexed`; совпадает ли размерность embedding-модели. |
 | `make up` пытается собрать образ | Это нормально при первом запуске. Для обычной пересборки используйте `make up-build`. |
 | Graylog стартует долго | Для разработки запускайте `make fast-up`. |
@@ -323,5 +323,5 @@ curl -s http://localhost:8080/api/v1/projects/1/documents/1
 - [api/README.md](/Users/damir/Documents/Diploma_Kubsu/api/README.md) — устройство backend и worker.
 - [frontend/README.md](/Users/damir/Documents/Diploma_Kubsu/frontend/README.md) — запуск и структура интерфейса.
 - [document_parsing_service/README.md](/Users/damir/Documents/Diploma_Kubsu/document_parsing_service/README.md) — Docling.
-- [knowledge_db/mimir_schema.dbml](/Users/damir/Documents/Diploma_Kubsu/knowledge_db/mimir_schema.dbml) — схема данных.
+- [knowledge_db/rag-system_schema.dbml](/Users/damir/Documents/Diploma_Kubsu/knowledge_db/rag-system_schema.dbml) — схема данных.
 - [test_documents/contracts/README.md](/Users/damir/Documents/Diploma_Kubsu/test_documents/contracts/README.md) — сценарии проверки противоречий.

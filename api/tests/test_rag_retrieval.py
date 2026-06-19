@@ -84,7 +84,7 @@ async def test_retrieve_points_vectorizes_text_and_returns_structured_points(mon
             rag_dense_weight=0.7,
             rag_sparse_weight=0.3,
             rag_retrieval_top_k=5,
-            qdrant_collection_name="mimir_project",
+            qdrant_collection_name="rag-system-project",
         ),
     )
 
@@ -104,7 +104,7 @@ async def test_retrieve_points_vectorizes_text_and_returns_structured_points(mon
         include_payload=False,
     )
 
-    assert result["collection_name"] == "mimir_project_166"
+    assert result["collection_name"] == "rag-system-project_166"
     assert result["retrieval_mode"] == "hybrid"
     assert result["dense_weight"] == 0.4
     assert result["sparse_weight"] == 0.6
