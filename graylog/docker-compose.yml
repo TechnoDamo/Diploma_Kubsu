@@ -1,0 +1,81 @@
+services:
+  mongodb:
+    profiles: ["local-graylog"]
+    image: mongo:6
+    container_name: graylog-mongodb
+    volumes:
+      - graylog_mongodb_data:/data/db
+    networks:
+      - rag-system
+
+  elasticsearch:
+    profiles: ["local-graylog"]
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.23
+    container_name: graylog-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    volumes:
+      - graylog_es_data:/usr/share/elasticsearch/data
+    networks:
+      - rag-system
+
+  graylog:
+    profiles: ["local-graylog"]
+    image: graylog/graylog:5.2
+    container_name: graylog
+    environment:
+      GRAYLOG_PASSWORD_SECRET: somepasswordpepper
+      GRAYLOG_ROOT_PASSWORD_SHA2: 8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+      GRAYLOG_HTTP_EXTERNAL_URI: http://127.0.0.1:19000/
+      GRAYLOG_ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      GRAYLOG_MONGODB_URI: mongodb://mongodb:27017/graylog
+    ports:
+      - "${GRAYLOG_UI_HOST_PORT:-19000}:9000"
+      - "${GRAYLOG_GELF_HOST_PORT:-12201}:12201/udp"
+      - "${GRAYLOG_SYSLOG_HOST_PORT:-1514}:1514"
+      - "${GRAYLOG_EXTRA_HOST_PORT:-5555}:5555"
+    depends_on:
+      - mongodb
+      - elasticsearch
+    networks:
+      - rag-system
+
+  graylog-init:
+    profiles: ["local-graylog"]
+    image: curlimages/curl:8.8.0
+    container_name: rag-system-graylog-init
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo "Waiting for Graylog..."
+        for i in $$(seq 60); do
+          if curl -s http://graylog:9000/api/system/lbstatus -u admin:admin >/dev/null 2>&1; then
+            echo "Graylog ready"
+            break
+          fi
+          sleep 5
+        done
+        echo "Creating GELF TCP input..."
+        curl -s -X POST http://graylog:9000/api/system/inputs \
+          -u admin:admin \
+          -H "Content-Type: application/json" \
+          -H "X-Requested-By: cli" \
+          -d '{"title":"GELF TCP","type":"org.graylog2.inputs.gelf.tcp.GELFTCPInput","configuration":{"bind_address":"0.0.0.0","port":12201,"recv_buffer_size":1048576},"global":true}' || true
+        echo "Graylog init completed"
+    depends_on:
+      - graylog
+    restart: "no"
+    networks:
+      - rag-system
+
+volumes:
+  graylog_mongodb_data:
+  graylog_es_data:
+
+networks:
+  rag-system:
+    name: rag-system
+    driver: bridge

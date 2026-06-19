@@ -1,0 +1,17 @@
+services:
+  docling:
+    profiles: ["local-docling"]
+    image: quay.io/docling-project/docling-serve
+    container_name: rag-system-docling
+    restart: unless-stopped
+    ports:
+      - "${DOCLING_PORT:-5001}:5001"
+    environment:
+      DOCLING_SERVE_ENABLE_UI: ${DOCLING_SERVE_ENABLE_UI:-1}
+    networks:
+      - rag-system
+
+networks:
+  rag-system:
+    name: rag-system
+    driver: bridge

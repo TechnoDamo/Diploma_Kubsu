@@ -1,0 +1,51 @@
+[project]
+name = "rag-system-api"
+version = "1.0.0"
+description = "RAG System - Intelligent RAG System with Cross-Document Analysis"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
+    "qdrant-client[fastembed]>=1.12.0",
+    "httpx>=0.28.0",
+    "python-multipart>=0.0.18",
+    "structlog>=24.4.0",
+    "PyPDF2>=3.0.0",
+    "python-docx>=1.1.0",
+    "beautifulsoup4>=4.12.0",
+    "graypy>=2.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.25.0",
+    "ruff>=0.8.0",
+    "httpx>=0.28.0",
+]
+
+[tool.ruft]
+line-length = 100
+target-version = "py312"
+
+[tool.ruft.lint]
+select = ["E", "F", "I", "N", "W"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.uv]
+package = false
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

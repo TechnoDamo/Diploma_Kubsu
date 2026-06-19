@@ -1,0 +1,82 @@
+
+    package "Централизованное логирование" as logging_layer {
+        together {
+            node "Система логирования Graylog\n<i>graylog/graylog:5.2</i>" as graylog_container <<Контейнер>> {
+            }
+            node "Служебная БД MongoDB для Graylog\n<i>mongo:6</i>" as mongodb_container <<Контейнер>> {
+            }
+            node "Индексное хранилище Elasticsearch для Graylog\n<i>docker.elastic.co/elasticsearch/elasticsearch:7.17.23</i>" as elastic_container <<Контейнер>> {
+            }
+        }
+        node "Инициализация Graylog\n<i>curlimages/curl:8.8.0</i>" as graylog_init_container <<Контейнер>> {
+        }
+    }
+    package "Тома Docker" as volumes_layer {
+        database "Том PostgreSQL:\n<i>rag-system-postgres-data</i>" as postgres_volume
+        database "Том Qdrant:\n<i>qdrant_data</i>" as qdrant_volume
+        database "Том MinIO:\n<i>minio_data</i>" as minio_volume
+        database "Том файлов приложения:\n<i>rag-system-files</i>" as files_volume
+        database "Кэш моделей:\n<i>HuggingFace cache</i>" as hf_cache_volume
+        database "Том MongoDB Graylog:\n<i>graylog_mongodb_data</i>" as graylog_mongo_volume
+        database "Том Elasticsearch Graylog:\n<i>graylog_es_data</i>" as graylog_es_volume
+    }
+}
+node "Сервер(а) облачного провайдера" as cloud <<server>> {
+    package "Потенциальные SaaS-замены" as saas_group {
+        together {
+            artifact "OpenAI-совместимый API БЯМ" as llm_api
+            artifact "OpenAI-совместимый API эмбеддингов" as embedding_api
+            artifact "Управляемая PostgreSQL" as postgres_saas
+        }
+        together {
+            artifact "Управляемое векторное хранилище" as vector_saas
+            artifact "S3-совместимое объектное хранилище" as s3_saas
+            artifact "Сервис извлечения текста из документов" as parsing_saas
+        }
+        together {
+            artifact "Централизованное логирование" as logging_saas
+            artifact "Мониторинг и трассировка" as monitoring_saas
+        }
+    }
+}
+note bottom of cloud
+  Указанные компоненты могут использоваться
+  в локальном контуре при развёртывании
+  соответствующих контейнеров или заменяться
+  облачными SaaS-сервисами провайдера.
+end note
+' Основные связи между локальными группами
+frontend_container --> api_container
+api_container --> storage_layer
+worker_container --> storage_layer
+api_container --> parsing_layer
+worker_container --> parsing_layer
+api_container --> local_ai_layer
+worker_container --> local_ai_layer
+api_container --> logging_layer
+worker_container --> logging_layer
+' Единый канал к облачным заменам
+app_layer -right-> cloud : внешние SaaS-сервисы
+' Служебные связи Graylog
+graylog_container --> mongodb_container
+graylog_container --> elastic_container
+graylog_init_container --> graylog_container
+' Docker volumes
+postgres_container .. postgres_volume
+qdrant_container .. qdrant_volume
+minio_container .. minio_volume
+api_container .. files_volume
+worker_container .. files_volume
+api_container .. hf_cache_volume
+worker_container .. hf_cache_volume
+vllm_container .. hf_cache_volume
+tei_container .. hf_cache_volume
+mongodb_container .. graylog_mongo_volume
+elastic_container .. graylog_es_volume
+' Подсказки компоновщику, чтобы стрелка SaaS не пересекала локальные контейнеры
+app_layer -[hidden]right- cloud
+storage_layer -[hidden]down- parsing_layer
+parsing_layer -[hidden]down- local_ai_layer
+local_ai_layer -[hidden]down- logging_layer
+logging_layer -[hidden]down- volumes_layer
+@enduml

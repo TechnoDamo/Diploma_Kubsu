@@ -1,0 +1,31 @@
+services:
+  llm:
+    profiles: ["local-llm"]
+    image: ${LLM_GPU_IMAGE:-vllm/vllm-openai:v0.6.3}
+    container_name: rag-system-llm
+    entrypoint: /opt/rag_system/start-vllm.sh
+    ports:
+      - "${LLM_PORT:-8091}:8080"
+    volumes:
+      - ${LLM_MODELS_DIR:-${HOME}/.cache/huggingface/hub}:/models
+      - ./start-vllm.sh:/opt/rag_system/start-vllm.sh:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - rag-system
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+networks:
+  rag-system:
+    name: rag-system
+    driver: bridge

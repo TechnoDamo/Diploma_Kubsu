@@ -1,0 +1,25 @@
+services:
+  qdrant:
+    profiles: ["local-qdrant"]
+    image: ${QDRANT_IMAGE:-qdrant/qdrant:v1.17.0}
+    container_name: rag-system-qdrant
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - rag-system
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 1 bash -c 'echo >/dev/tcp/localhost/6333' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  qdrant_data:
+
+networks:
+  rag-system:
+    name: rag-system
+    driver: bridge

@@ -1,0 +1,89 @@
+@startuml
+title Верхнеуровневый процесс анализа противоречий
+
+actor "Пользователь" as User
+participant "Клиентское приложение" as Client
+participant "Серверное приложение" as Server
+database "Реляционная база данных" as RelDB
+participant "Фоновый обработчик" as Worker
+database "Векторная база данных" as VectorDB
+participant "Большая языковая модель" as LLM
+
+group Запуск анализа пользователем
+    User -> Client: Выбирает базовый документ\nи документы для сравнения
+    activate Client
+
+    Client -> Server: Отправляет запрос\nна анализ противоречий
+    activate Server
+
+    Server -> RelDB: Создаёт задачу анализа\nсо статусом "в очереди"
+    activate RelDB
+    RelDB --> Server: Идентификатор задачи
+    deactivate RelDB
+
+    Server --> Client: Возвращает идентификатор задачи
+    deactivate Server
+end
+
+group Асинхронная обработка задачи
+    Worker -> RelDB: Получает следующую\nзадачу из очереди
+    activate Worker
+    activate RelDB
+    RelDB --> Worker: Данные задачи
+    deactivate RelDB
+
+    Worker -> RelDB: Переводит задачу\nв статус "в обработке"
+    activate RelDB
+    RelDB --> Worker: Статус обновлён
+    deactivate RelDB
+end
+
+group Подбор фрагментов для сравнения
+    Worker -> RelDB: Получает фрагменты\nбазового документа
+    activate RelDB
+    RelDB --> Worker: Фрагменты базового документа
+    deactivate RelDB
+
+    Worker -> VectorDB: Ищет похожие фрагменты\nв целевых документах
+    activate VectorDB
+    VectorDB --> Worker: Кандидаты для сравнения
+    deactivate VectorDB
+
+    Worker -> Worker: Формирует пары фрагментов\nдля проверки
+end
+
+group Проверка противоречий
+    Worker -> LLM: Передаёт пары фрагментов\nдля анализа
+    activate LLM
+    LLM --> Worker: Результаты проверки\nи объяснения
+    deactivate LLM
+
+    Worker -> Worker: Группирует найденные\nпротиворечия по документам
+end
+
+group Сохранение результата
+    Worker -> RelDB: Сохраняет результат анализа\nи статус "завершено"
+    activate RelDB
+    RelDB --> Worker: Результат сохранён
+    deactivate RelDB
+
+    deactivate Worker
+end
+
+group Получение результата пользователем
+    Client -> Server: Запрашивает статус\nи результат задачи
+    activate Server
+
+    Server -> RelDB: Получает данные задачи
+    activate RelDB
+    RelDB --> Server: Статус и результат анализа
+    deactivate RelDB
+
+    Server --> Client: Возвращает результат
+    deactivate Server
+
+    Client --> User: Показывает найденные\nпротиворечия и объяснения
+    deactivate Client
+end
+
+@enduml
